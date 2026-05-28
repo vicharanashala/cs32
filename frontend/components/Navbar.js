@@ -78,6 +78,9 @@ export default function Navbar({ onSearch }) {
                         <Link href={`/users/${user.username}`} className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setProfileOpen(false)}>
                           Profile
                         </Link>
+                        <Link href="/saved" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setProfileOpen(false)}>
+                          Saved
+                        </Link>
                         <Link href="/notifications" className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-50" onClick={() => setProfileOpen(false)}>
                           Notifications
                         </Link>

@@ -103,6 +103,7 @@ faq-site/
 - **Real-time updates** — new answers appear instantly via Socket.IO
 - **Responsive** — mobile-friendly with Tailwind CSS
 - **Keyboard shortcuts** — efficient navigation without mouse
+- **Bookmarks / Collections** — save questions and organize them with custom tags
 
 ## Keyboard Shortcuts
 
@@ -126,6 +127,14 @@ These shortcuts work on the Questions and FAQs list pages, as well as in the sea
 | `GET /api/questions` | List questions           |
 | `POST /api/questions` | Create a question       |
 | `GET /api/search`   | Search across all content |
+| `GET /api/users/me/saved` | Get user's saved questions (auth) |
+| `POST /api/users/me/saved` | Save a question (auth) |
+| `PATCH /api/users/me/saved/:questionId` | Update saved question notes/tags (auth) |
+| `DELETE /api/users/me/saved/:questionId` | Remove saved question (auth) |
+| `GET /api/users/me/saved/faqs` | Get user's saved FAQs (auth) |
+| `POST /api/users/me/saved/faqs` | Save an FAQ (auth) |
+| `PATCH /api/users/me/saved/faqs/:faqId` | Update saved FAQ notes/tags (auth) |
+| `DELETE /api/users/me/saved/faqs/:faqId` | Remove saved FAQ (auth) |
 
 ## Seeding Data
 

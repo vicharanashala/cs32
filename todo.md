@@ -102,7 +102,7 @@
 ### Content & Community
 - [ ] **Question Following / Watching** — follow a question, get notified of new answers/edits
 - [ ] **Answer Edit History** — track revisions, show diffs, moderator rollback
-- [ ] **Bookmarks / Collections** — organize saved questions into named folders
+- [x] **Bookmarks / Collections** — organize saved questions into named folders
 - [ ] **Question Bounties** — offer reputation points as bounty for answers
 
 ### User Experience

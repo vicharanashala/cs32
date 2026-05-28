@@ -3,6 +3,8 @@ import { Suspense, useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import Pagination from '@/components/Pagination';
+import FAQCard from '@/components/FAQCard';
+import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 
 function isInputFocused() {
@@ -13,13 +15,24 @@ function isInputFocused() {
 function FAQsPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [faqs, setFaqs] = useState([]);
   const [pagination, setPagination] = useState(null);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+  const [savedFaqIds, setSavedFaqIds] = useState(new Set());
   const page = parseInt(searchParams.get('page') || '1');
   const category = searchParams.get('category') || '';
+
+  const fetchSavedFaqs = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await api.get('/users/me/saved/faqs');
+      const ids = new Set(data.saved?.map(s => s.faq?._id) || []);
+      setSavedFaqIds(ids);
+    } catch (_) {}
+  }, [user]);
 
   useEffect(() => {
     setLoading(true);
@@ -35,6 +48,10 @@ function FAQsPageContent() {
       .catch(console.error)
       .finally(() => setLoading(false));
   }, [page, category]);
+
+  useEffect(() => {
+    fetchSavedFaqs();
+  }, [fetchSavedFaqs]);
 
   useEffect(() => {
     setSelectedIndex(-1);
@@ -108,24 +125,12 @@ function FAQsPageContent() {
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {faqs.map((faq, idx) => (
-              <Link
+              <FAQCard
                 key={faq._id}
-                href={`/faqs/${faq.slug}`}
-                className={`card-hover p-6 border-2 transition-all ${
-                  selectedIndex === idx ? 'border-primary-500 bg-primary-50' : 'border-transparent'
-                }`}
-              >
-                <div className="flex items-center gap-2 mb-3">
-                  {faq.isOfficial && <span className="badge-green text-xs">Official</span>}
-                  {faq.category && <span className="badge-gray text-xs capitalize">{faq.category}</span>}
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">{faq.title}</h3>
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">{faq.description}</p>
-                <div className="flex items-center gap-3 text-xs text-gray-500">
-                  <span>{faq.itemCount || 0} items</span>
-                  <span>{faq.viewCount || 0} views</span>
-                </div>
-              </Link>
+                faq={{ ...faq, isSaved: savedFaqIds.has(faq._id) }}
+                isSelected={selectedIndex === idx}
+                onSelect={() => setSelectedIndex(idx)}
+              />
             ))}
           </div>
           <Pagination pagination={pagination} basePath="/faqs" queryParams={{ category }} />
