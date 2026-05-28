@@ -22,6 +22,7 @@ function FAQsPageContent() {
   const [loading, setLoading] = useState(true);
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const [savedFaqIds, setSavedFaqIds] = useState(new Set());
+  const [sort, setSort] = useState(searchParams.get('sort') || 'newest');
   const page = parseInt(searchParams.get('page') || '1');
   const category = searchParams.get('category') || '';
 
@@ -34,11 +35,20 @@ function FAQsPageContent() {
     } catch (_) {}
   }, [user]);
 
+  const changeSort = (newSort) => {
+    setSort(newSort);
+    const params = new URLSearchParams();
+    if (newSort !== 'newest') params.set('sort', newSort);
+    if (category) params.set('category', category);
+    const query = params.toString();
+    router.push(`/faqs${query ? `?${query}` : ''}`);
+  };
+
   useEffect(() => {
     setLoading(true);
     Promise.all([
-      api.get('/faqs', { page, category }),
-      api.get('/faqs', { limit: 100 }),
+      api.get('/faqs', { page, category, sort }),
+      api.get('/faqs', { limit: 100, sort: 'newest' }),
     ]).then(([data, all]) => {
       setFaqs(data.faqs || []);
       setPagination(data.pagination);
@@ -47,7 +57,7 @@ function FAQsPageContent() {
     })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [page, category]);
+  }, [page, category, sort]);
 
   useEffect(() => {
     fetchSavedFaqs();
@@ -81,6 +91,28 @@ function FAQsPageContent() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">FAQs</h1>
         <p className="text-sm text-gray-500 mt-1">Curated answers to commonly asked questions</p>
+      </div>
+
+      {/* Sort tabs */}
+      <div className="flex gap-1 mb-4 border-b border-gray-200">
+        {[
+          { value: 'newest', label: 'Newest' },
+          { value: 'views', label: 'Most Viewed' },
+          { value: 'saved', label: 'Most Saved' },
+          { value: 'title', label: 'A-Z' },
+        ].map(s => (
+          <button
+            key={s.value}
+            onClick={() => changeSort(s.value)}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              sort === s.value
+                ? 'border-primary-600 text-primary-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            {s.label}
+          </button>
+        ))}
       </div>
 
       {/* Category filter */}
@@ -133,7 +165,7 @@ function FAQsPageContent() {
               />
             ))}
           </div>
-          <Pagination pagination={pagination} basePath="/faqs" queryParams={{ category }} />
+          <Pagination pagination={pagination} basePath="/faqs" queryParams={{ sort: sort !== 'newest' ? { sort } : {}, category }} />
         </>
       )}
     </div>
