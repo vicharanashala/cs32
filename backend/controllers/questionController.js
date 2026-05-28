@@ -70,7 +70,8 @@ exports.getQuestions = async (req, res, next) => {
     switch (req.query.sort) {
       case 'newest': sort.createdAt = -1; break;
       case 'active': sort.lastActivity = -1; break;
-      case 'votes': sort.upvotes = -1; break;
+      case 'votes':
+      case 'liked': sort.upvotes = -1; break;
       case 'views': sort.viewCount = -1; break;
       default: sort.createdAt = -1;
     }

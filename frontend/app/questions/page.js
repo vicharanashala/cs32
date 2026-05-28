@@ -82,6 +82,7 @@ function QuestionsPageContent() {
           { value: 'newest', label: 'Newest' },
           { value: 'active', label: 'Active' },
           { value: 'votes', label: 'Most Voted' },
+          { value: 'liked', label: 'Most Liked' },
           { value: 'views', label: 'Most Viewed' },
         ].map(s => (
           <button

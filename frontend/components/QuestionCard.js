@@ -8,7 +8,8 @@ import toast from 'react-hot-toast';
 
 export default function QuestionCard({ question }) {
   const { user } = useAuth();
-  const [voteScore, setVoteScore] = useState((question.upvotes || 0) - (question.downvotes || 0));
+  const [upvotes, setUpvotes] = useState(question.upvotes || 0);
+  const [downvotes, setDownvotes] = useState(question.downvotes || 0);
   const [userVote, setUserVote] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -32,7 +33,8 @@ export default function QuestionCard({ question }) {
       const data = await api.get(`/votes/Question/${question._id}`);
       setUserVote(data.vote);
       const newQuestion = await api.get(`/questions/${question._id}`);
-      setVoteScore((newQuestion.question.upvotes || 0) - (newQuestion.question.downvotes || 0));
+      setUpvotes(newQuestion.question.upvotes || 0);
+      setDownvotes(newQuestion.question.downvotes || 0);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -48,16 +50,19 @@ export default function QuestionCard({ question }) {
             onClick={(e) => handleVote(e, 'upvote')}
             className={`p-1 rounded hover:bg-gray-100 ${userVote === 'upvote' ? 'text-green-600' : 'text-gray-400 hover:text-green-600'} ${loading ? 'opacity-50' : ''}`}
             disabled={loading}
+            title={`${upvotes} likes`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
           </button>
-          <span className={`font-semibold ${voteScore > 0 ? 'text-green-600' : voteScore < 0 ? 'text-red-600' : 'text-gray-900'}`}>
-            {voteScore}
+          <span className={`font-semibold ${upvotes - downvotes > 0 ? 'text-green-600' : upvotes - downvotes < 0 ? 'text-red-600' : 'text-gray-900'}`}>
+            {upvotes - downvotes}
           </span>
+          <span className="text-xs text-gray-500" title={`${upvotes} likes, ${downvotes} dislikes`}>score</span>
           <button
             onClick={(e) => handleVote(e, 'downvote')}
             className={`p-1 rounded hover:bg-gray-100 ${userVote === 'downvote' ? 'text-red-600' : 'text-gray-400 hover:text-red-600'} ${loading ? 'opacity-50' : ''}`}
             disabled={loading}
+            title={`${downvotes} dislikes`}
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
           </button>
