@@ -29,7 +29,6 @@ exports.vote = async (req, res, next) => {
     // Toggle: remove if same vote
     if (existingVote && existingVote.voteType === voteType) {
       await existingVote.deleteOne();
-      const inc = voteType === 'upvote' ? -1 : -1;
       await Model.findByIdAndUpdate(targetId, {
         $inc: { [`${voteType}s`]: -1 },
       });
