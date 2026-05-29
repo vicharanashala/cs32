@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { validationResult } = require('express-validator');
 const Answer = require('../models/Answer');
 const Question = require('../models/Question');
@@ -57,7 +58,8 @@ exports.createAnswer = async (req, res, next) => {
 exports.getAnswers = async (req, res, next) => {
   try {
     const { page, limit, skip } = paginate(req.query.page, req.query.limit);
-    const filter = { question: req.params.questionId, isDeleted: false };
+    const questionId = new mongoose.Types.ObjectId(req.params.questionId);
+    const filter = { question: questionId, isDeleted: false };
 
     const sort = {};
     switch (req.query.sort) {
