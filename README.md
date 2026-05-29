@@ -20,7 +20,6 @@ A community-driven Q&A and FAQ platform built for the Vicharanashala Internship 
 - Node.js 20 (use [nvm](https://github.com/nvm-sh/nvm): `nvm use`)
 - MongoDB running on `localhost:27017`
 - Redis running on `localhost:6379`
-- Elasticsearch 8.x running on `localhost:9200` (optional — search still works without it)
 
 ### 1. Install dependencies
 

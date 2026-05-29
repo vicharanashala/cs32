@@ -21,13 +21,9 @@ export default function QuestionDetailPage() {
   const [answering, setAnswering] = useState(false);
   const [userVotes, setUserVotes] = useState({});
   const [saved, setSaved] = useState(false);
-  const [downvoteModal, setDownvoteModal] = useState({ open: false, targetType: null, targetId: null });
-  const [selectedReason, setSelectedReason] = useState('');
-  const [reasonText, setReasonText] = useState('');
-  const [mergedQuestions, setMergedQuestions] = useState([]);
-  const [showMerged, setShowMerged] = useState(false);
-  const [mergeModal, setMergeModal] = useState({ open: false, selected: [] });
-  const [similarForMerge, setSimilarForMerge] = useState([]);
+  const [recentlyPostedId, setRecentlyPostedId] = useState(null);
+  const [escalateModal, setEscalateModal] = useState({ open: false });
+  const [escalationReason, setEscalationReason] = useState('');
 
   const fetchQuestion = useCallback(async () => {
     try {
@@ -42,10 +38,8 @@ export default function QuestionDetailPage() {
   const fetchAnswers = useCallback(async () => {
     try {
       const data = await api.get(`/answers/question/${id}`);
-      setAnswers(Array.isArray(data.answers) ? data.answers : []);
-    } catch (err) {
-      console.error('Failed to fetch answers:', err);
-    }
+      setAnswers(data.answers || []);
+    } catch (_) {}
   }, [id]);
 
   useEffect(() => {
@@ -54,22 +48,13 @@ export default function QuestionDetailPage() {
   }, [fetchQuestion, fetchAnswers]);
 
   useEffect(() => {
-    if (question?.isMasterFAQ) {
-      api.get(`/questions/${id}/merged-questions`)
-        .then(data => setMergedQuestions(data.mergedQuestions || []))
-        .catch(() => {});
-    } else {
-      setMergedQuestions([]);
-    }
-  }, [question?.isMasterFAQ, id]);
-
-  useEffect(() => {
     if (socket && id) {
       socket.emit('join:question', id);
       socket.on('answer:new', (data) => {
-        if (data.answer) {
+        if (data.answer && data.answer._id !== recentlyPostedId) {
           setAnswers(prev => [data.answer, ...prev]);
         }
+        setRecentlyPostedId(null);
       });
       return () => {
         socket.emit('leave:question', id);
@@ -78,29 +63,10 @@ export default function QuestionDetailPage() {
     }
   }, [socket, id]);
 
-  const handleVote = async (targetType, targetId, voteType, reason, reasonText) => {
+  const handleVote = async (targetType, targetId, voteType) => {
     if (!user) { toast.error('Please login to vote'); return; }
-    if (voteType === 'downvote' && !reason) {
-      setDownvoteModal({ open: true, targetType, targetId });
-      return;
-    }
     try {
-      await api.post('/votes', { targetType, targetId, voteType, reason, reasonText });
-      setDownvoteModal({ open: false, targetType: null, targetId: null });
-      setSelectedReason('');
-      setReasonText('');
-
-      // Optimistic update for answers - update locally then verify with fetch
-      if (targetType === 'Answer') {
-        setAnswers(prev => prev.map(a => {
-          if (a._id === targetId) {
-            const delta = voteType === 'upvote' ? 1 : -1;
-            return { ...a, upvotes: a.upvotes + delta };
-          }
-          return a;
-        }));
-      }
-
+      await api.post('/votes', { targetType, targetId, voteType });
       if (targetType === 'Question') {
         fetchQuestion();
       } else {
@@ -109,10 +75,6 @@ export default function QuestionDetailPage() {
     } catch (err) {
       toast.error(err.message || 'Vote failed');
     }
-  };
-
-  const submitDownvote = () => {
-    handleVote(downvoteModal.targetType, downvoteModal.targetId, 'downvote', selectedReason, reasonText);
   };
 
   const handleSave = async () => {
@@ -140,6 +102,7 @@ export default function QuestionDetailPage() {
     setAnswering(true);
     try {
       const data = await api.post(`/answers/question/${id}`, { body: newAnswer });
+      setRecentlyPostedId(data.answer._id);
       setAnswers(prev => [data.answer, ...prev]);
       setNewAnswer('');
       toast.success('Answer posted!');
@@ -159,6 +122,26 @@ export default function QuestionDetailPage() {
     } catch (err) {
       toast.error(err.message);
     }
+  };
+
+  const handleEscalate = async () => {
+    try {
+      await api.patch(`/questions/${id}/escalate`, { reason: escalationReason });
+      toast.success('Question escalated. A moderator will review it.');
+      setEscalateModal({ open: false });
+      setEscalationReason('');
+      fetchQuestion();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const canEscalate = () => {
+    if (!user || user._id !== question.author?._id) return false;
+    if (question.isEscalated || question.resolutionStatus === 'escalated') return false;
+    const twentyFourHoursAgo = Date.now() - 24 * 60 * 60 * 1000;
+    if (new Date(question.createdAt).getTime() < twentyFourHoursAgo && question.answerCount === 0) return true;
+    return false;
   };
 
   const handleDelete = async () => {
@@ -194,109 +177,6 @@ export default function QuestionDetailPage() {
     }
   };
 
-  const handleConfirmResolved = async () => {
-    try {
-      await api.patch(`/questions/${id}/confirm-resolution`);
-      toast.success('Thanks for confirming! Glad we could help.');
-      fetchQuestion();
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleEscalate = async () => {
-    const reason = prompt('Why is the answer not working for you?');
-    if (reason === null) return;
-    try {
-      await api.patch(`/questions/${id}/escalate`, { reason });
-      toast.success('Question escalated. A moderator will review it.');
-      fetchQuestion();
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleResolveEscalation = async () => {
-    const note = prompt('Resolution note (optional):');
-    try {
-      await api.patch(`/questions/${id}/escalate/resolve`, { resolutionNote: note });
-      toast.success('Escalation resolved');
-      fetchQuestion();
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handlePromoteMaster = async () => {
-    if (!confirm('Promote this FAQ to a Master FAQ? Other similar questions can be merged into it.')) return;
-    try {
-      await api.patch(`/questions/${id}/promote-master`);
-      toast.success('Promoted to Master FAQ');
-      fetchQuestion();
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleMergeFAQ = async () => {
-    const masterId = prompt('Enter the ID of the Master FAQ to merge this question into:');
-    if (!masterId) return;
-    try {
-      await api.patch(`/questions/${id}/merge`, { masterFAQId: masterId });
-      toast.success('Question merged into Master FAQ');
-      fetchQuestion();
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const handleOpenMergeModal = async () => {
-    try {
-      const data = await api.get('/questions/similar', { title: question.title });
-      const questions = (data.similar || []).concat(data.duplicates || []).filter(q => q._id !== id && q.status !== 'closed');
-      setSimilarForMerge(questions);
-      setMergeModal({ open: true, selected: [] });
-    } catch (err) {
-      toast.error('Failed to fetch similar questions');
-    }
-  };
-
-  const handleMergeSelected = async () => {
-    if (mergeModal.selected.length === 0) {
-      toast.error('Select at least one question to merge');
-      return;
-    }
-    if (!question.isMasterFAQ && !confirm('This will promote the current question to Master FAQ first. Continue?')) {
-      return;
-    }
-    try {
-      if (!question.isMasterFAQ) {
-        await api.patch(`/questions/${id}/promote-master`);
-      }
-      for (const qId of mergeModal.selected) {
-        await api.patch(`/questions/${qId}/merge`, { masterFAQId: id });
-      }
-      toast.success(`Merged ${mergeModal.selected.length} questions into this Master FAQ`);
-      setMergeModal({ open: false, selected: [] });
-      fetchQuestion();
-      if (question.isMasterFAQ) {
-        const data = await api.get(`/questions/${id}/merged-questions`);
-        setMergedQuestions(data.mergedQuestions || []);
-      }
-    } catch (err) {
-      toast.error(err.message);
-    }
-  };
-
-  const toggleMergeSelection = (qId) => {
-    setMergeModal(prev => ({
-      ...prev,
-      selected: prev.selected.includes(qId)
-        ? prev.selected.filter(id => id !== qId)
-        : [...prev.selected, qId]
-    }));
-  };
-
   if (loading && !question) {
     return (
       <div className="max-w-4xl mx-auto px-4 py-8">
@@ -306,70 +186,231 @@ export default function QuestionDetailPage() {
           <div className="h-4 bg-gray-200 rounded w-2/3" />
         </div>
       </div>
-);
-            )}
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => { setDownvoteModal({ open: false, targetType: null, targetId: null }); setSelectedReason(''); setReasonText(''); }}
-                className="btn-secondary"
-              >
-                Cancel
-              </button>
-              <button onClick={submitDownvote} className="btn-danger" disabled={!selectedReason}>
-                Submit
-              </button>
-            </div>
+    );
+  }
+
+  if (!question) return null;
+
+  return (
+    <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Duplicate Notice */}
+      {question.isDuplicate && question.duplicateOf && (
+        <div className="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2 text-yellow-800">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="font-semibold">This question has been marked as a duplicate</span>
+          </div>
+          <Link href={`/questions/${question.duplicateOf._id || question.duplicateOf}`} className="text-primary-600 hover:text-primary-700 text-sm mt-1 inline-block">
+            View the original question →
+          </Link>
+        </div>
+      )}
+
+      {/* Closed Notice */}
+      {question.status === 'closed' && !question.isDuplicate && (
+        <div className="mb-4 p-4 bg-gray-100 border border-gray-300 rounded-lg">
+          <div className="flex items-center gap-2 text-gray-700">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            <span className="font-semibold">This question is closed: {question.closedReason || 'No reason given'}</span>
           </div>
         </div>
       )}
 
-      {/* Merge Questions Modal */}
-      {mergeModal.open && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-gray-900">Merge Questions into Master FAQ</h3>
-              <button onClick={() => setMergeModal({ open: false, selected: [] })} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+      {/* Outdated Notice */}
+      {question.isFAQ && question.isOutdated && (
+        <div className="mb-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+          <div className="flex items-center gap-2 text-orange-800">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="font-semibold">This FAQ may be outdated</span>
+          </div>
+          {question.outdatedReason && (
+            <p className="text-sm text-orange-700 mt-1">{question.outdatedReason}</p>
+          )}
+          <p className="text-xs text-orange-600 mt-1">Last verified: {question.lastVerifiedAt ? formatDate(question.lastVerifiedAt) : 'Never'}</p>
+        </div>
+      )}
+
+      {/* FAQ Verified Badge */}
+      {question.isFAQ && !question.isOutdated && question.lastVerifiedAt && (
+        <div className="mb-4 p-3 bg-green-50 border border-green-200 rounded-lg flex items-center gap-2 text-green-800 text-sm">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <span>Verified on {formatDate(question.lastVerifiedAt)}</span>
+        </div>
+      )}
+
+      {/* Question Header */}
+      <div className="mb-6">
+        <div className="flex items-start justify-between gap-4">
+          <h1 className={`text-2xl sm:text-3xl font-bold text-gray-900 ${question.status === 'closed' ? 'opacity-60' : ''}`}>{question.title}</h1>
+          <div className="flex items-center gap-2 shrink-0">
+            <button onClick={handleSave} className="btn-secondary btn-sm">
+              {saved ? 'Saved' : 'Save'}
+            </button>
+            {(user?._id === question.author?._id || user?.role === 'admin') && (
+              <button onClick={handleDelete} className="btn-danger btn-sm">Delete</button>
+            )}
+            {question.isFAQ && (user?.role === 'admin' || user?.role === 'moderator') && (
+              <button onClick={handleVerify} className="btn-secondary btn-sm">Verify FAQ</button>
+            )}
+            {question.isFAQ && (user?.role === 'admin' || user?.role === 'moderator') && (
+              <button onClick={() => handleMarkOutdated()} className="btn-secondary btn-sm">Mark Outdated</button>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-3 mt-3">
+          {question.tagNames?.map(tag => (
+            <Link key={tag} href={`/tags/${tag}`} className="badge-primary">{tag}</Link>
+          ))}
+        </div>
+        <div className="flex items-center gap-3 mt-3 text-sm text-gray-500">
+          <Link href={`/users/${question.author?.username}`} className="flex items-center gap-1 hover:text-primary-600">
+            <div className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-[10px] font-medium">
+              {(question.author?.displayName || question.author?.username || '?')[0]}
             </div>
-            <p className="text-sm text-gray-600 mb-4">
-              Select questions to merge into this Master FAQ. Similar questions are shown below.
-            </p>
-            <div className="flex-1 overflow-y-auto space-y-2 mb-4">
-              {similarForMerge.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No similar questions found</p>
-              ) : (
-                similarForMerge.map(q => (
-                  <label
-                    key={q._id}
-                    className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                      mergeModal.selected.includes(q._id)
-                        ? 'border-primary-500 bg-primary-50'
-                        : 'border-gray-200 hover:bg-gray-50'
-                    }`}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={mergeModal.selected.includes(q._id)}
-                      onChange={() => toggleMergeSelection(q._id)}
-                      className="w-4 h-4 text-primary-600 rounded"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-gray-900 line-clamp-1">{q.title}</h4>
-                      <div className="flex items-center gap-2 mt-1 text-xs text-gray-500">
-                        <span>{q.answerCount || 0} answers</span>
-                        <span>by {q.author?.displayName || q.author?.username || 'Unknown'}</span>
+            <span>{question.author?.displayName || question.author?.username}</span>
+          </Link>
+          <span>asked {formatDate(question.createdAt)}</span>
+          <span>{question.viewCount} views</span>
+          {canEscalate() && (
+            <button onClick={() => setEscalateModal({ open: true })} className="ml-2 text-orange-600 hover:text-orange-700 font-medium text-xs border border-orange-300 rounded px-2 py-0.5">
+              Escalate Query
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="flex gap-4">
+        {/* Vote sidebar */}
+        <div className="hidden sm:flex flex-col items-center gap-2">
+          <button onClick={() => handleVote('Question', id, 'upvote')} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-green-600 transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+          </button>
+          <span className="font-bold text-lg text-gray-900">{question.upvotes - question.downvotes}</span>
+          <button onClick={() => handleVote('Question', id, 'downvote')} className="p-1.5 rounded hover:bg-gray-100 text-gray-400 hover:text-red-600 transition-colors">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+          </button>
+        </div>
+
+        {/* Question body */}
+        <div className="flex-1 min-w-0">
+          <div className="card p-6 mb-4">
+            <MarkdownRenderer content={question.body} />
+          </div>
+
+          {/* Answer count */}
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-gray-900">
+              {question.answerCount || 0} {(question.answerCount || 0) === 1 ? 'Answer' : 'Answers'}
+            </h2>
+          </div>
+
+          {/* Answers */}
+          {answers.length === 0 ? (
+            <div className="card p-8 text-center mb-6">
+              <p className="text-gray-500">No answers yet. Be the first to answer!</p>
+            </div>
+          ) : (
+            <div className="space-y-4 mb-6">
+              {answers.map(answer => (
+                <div key={answer._id} className={`card p-6 ${answer.isAccepted ? 'border-green-300 ring-1 ring-green-200' : ''}`}>
+                  <div className="flex gap-4">
+                    <div className="hidden sm:flex flex-col items-center gap-1">
+                      <button onClick={() => handleVote('Answer', answer._id, 'upvote')} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-green-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                      </button>
+                      <span className="font-semibold text-sm">{answer.upvotes - answer.downvotes}</span>
+                      <button onClick={() => handleVote('Answer', answer._id, 'downvote')} className="p-1 rounded hover:bg-gray-100 text-gray-400 hover:text-red-600">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                    </div>
+                    <div className="flex-1">
+                      <MarkdownRenderer content={answer.body} />
+                      <div className="mt-4 flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-sm text-gray-500">
+                          <Link href={`/users/${answer.author?.username}`} className="flex items-center gap-1 hover:text-primary-600">
+                            <div className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-[10px] font-medium">
+                              {(answer.author?.displayName || answer.author?.username || '?')[0]}
+                            </div>
+                            <span>{answer.author?.displayName || answer.author?.username}</span>
+                          </Link>
+                          <span>answered {formatDate(answer.createdAt)}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {answer.isOfficial && <span className="badge-green">Official</span>}
+                          {answer.isAccepted && <span className="badge-green">Accepted</span>}
+                          {question.author?._id === user?._id && !answer.isAccepted && (
+                            <button onClick={() => handleAcceptAnswer(answer._id)} className="btn-secondary btn-sm">
+                              Accept
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </label>
-                ))
-              )}
+                  </div>
+                </div>
+              ))}
             </div>
-            <div className="flex gap-3 justify-end border-t pt-4">
-              <button onClick={() => setMergeModal({ open: false, selected: [] })} className="btn-secondary">
+          )}
+
+          {/* Answer form */}
+          {user ? (
+            <div className="card p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Your Answer</h3>
+              <form onSubmit={handleSubmitAnswer}>
+                <textarea
+                  rows={6}
+                  value={newAnswer}
+                  onChange={(e) => setNewAnswer(e.target.value)}
+                  className="input mb-3 font-mono text-sm"
+                  placeholder="Write your answer in Markdown..."
+                  maxLength={50000}
+                />
+                <button type="submit" disabled={answering} className="btn-primary">
+                  {answering ? 'Posting...' : 'Post Answer'}
+                </button>
+              </form>
+            </div>
+          ) : (
+            <div className="card p-6 text-center">
+              <p className="text-gray-500">
+                <Link href={`/auth?mode=login&redirect=/questions/${id}`} className="text-primary-600 hover:text-primary-700 font-medium">
+                  Login
+                </Link> to answer this question
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Escalate Question Modal */}
+      {escalateModal.open && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Escalate Question</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              Your question has had no responses for 24 hours. Escalating will notify moderators to review and potentially highlight your question.
+            </p>
+            <textarea
+              value={escalationReason}
+              onChange={(e) => setEscalationReason(e.target.value)}
+              className="input mb-4 w-full"
+              placeholder="Reason for escalation (optional)"
+              rows={3}
+            />
+            <div className="flex gap-3 justify-end">
+              <button onClick={() => { setEscalateModal({ open: false }); setEscalationReason(''); }} className="btn-secondary">
                 Cancel
               </button>
-              <button onClick={handleMergeSelected} className="btn-primary" disabled={mergeModal.selected.length === 0}>
-                Merge {mergeModal.selected.length} Question{mergeModal.selected.length !== 1 ? 's' : ''}
+              <button onClick={handleEscalate} className="btn-warning">
+                Escalate
               </button>
             </div>
           </div>

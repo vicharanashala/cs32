@@ -1,10 +1,12 @@
 const { validationResult } = require('express-validator');
 const Question = require('../models/Question');
 const Tag = require('../models/Tag');
+const QuestionView = require('../models/QuestionView');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPaginationMeta } = require('../utils/helpers');
 const { indexQuestion, deleteQuestionIndex } = require('../services/searchService');
 const { emitToQuestion } = require('../socket');
+const { canDeleteQuestion, hasPermission, PERMISSIONS } = require('../utils/permissions');
 
 exports.createQuestion = async (req, res, next) => {
   try {
@@ -168,7 +170,24 @@ exports.getQuestion = async (req, res, next) => {
 
     if (!question) throw new AppError('Question not found', 404);
 
-    await Question.findByIdAndUpdate(question._id, { $inc: { viewCount: 1 } });
+    if (req.user) {
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      const existingView = await QuestionView.findOne({
+        question: question._id,
+        user: req.user._id,
+        viewedAt: { $gte: oneHourAgo },
+      });
+      if (!existingView) {
+        await QuestionView.findOneAndUpdate(
+          { question: question._id, user: req.user._id },
+          { viewedAt: new Date() },
+          { upsert: true, new: true }
+        );
+        await Question.findByIdAndUpdate(question._id, { $inc: { viewCount: 1 } });
+      }
+    } else {
+      await Question.findByIdAndUpdate(question._id, { $inc: { viewCount: 1 } });
+    }
 
     res.json({ question });
   } catch (err) {
@@ -217,8 +236,8 @@ exports.deleteQuestion = async (req, res, next) => {
   try {
     const question = await Question.findById(req.params.id);
     if (!question || question.isDeleted) throw new AppError('Question not found', 404);
-    if (question.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
-      throw new AppError('Not authorized', 403);
+    if (!canDeleteQuestion(req.user, question)) {
+      throw new AppError('Not authorized to delete this question', 403);
     }
 
     question.status = 'deleted';
@@ -432,16 +451,34 @@ exports.escalateQuestion = async (req, res, next) => {
     if (question.author.toString() !== req.user._id.toString()) {
       throw new AppError('Only the author can escalate', 403);
     }
-    if (!question.acceptedAnswer) {
-      throw new AppError('No accepted answer to escalate from', 400);
+    if (question.isEscalated) {
+      throw new AppError('Question already escalated', 400);
+    }
+    if (question.resolutionStatus === 'escalated') {
+      throw new AppError('Question already escalated', 400);
+    }
+
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    if (question.createdAt > twentyFourHoursAgo) {
+      throw new AppError('Question cannot be escalated within 24 hours of creation', 400);
+    }
+
+    const Answer = require('../models/Answer');
+    const otherAnswersCount = await Answer.countDocuments({
+      question: question._id,
+      author: { $ne: req.user._id },
+      isDeleted: false,
+    });
+    if (otherAnswersCount > 0) {
+      throw new AppError('Question has answers from other users, cannot escalate', 400);
     }
 
     question.resolutionStatus = 'escalated';
+    question.isEscalated = true;
     question.escalatedAt = new Date();
-    question.escalationReason = reason || 'Student still needs help';
+    question.escalationReason = reason || 'No response received within 24 hours';
     await question.save();
 
-    // Notify moderators/admins
     const Notification = require('../models/Notification');
     const User = require('../models/User');
     const moderators = await User.find({ role: { $in: ['admin', 'moderator'] } });
@@ -450,7 +487,7 @@ exports.escalateQuestion = async (req, res, next) => {
         recipient: mod._id,
         type: 'escalation',
         title: 'Question escalated - needs attention',
-        message: `Question "${question.title}" was escalated by the student: ${reason || 'No reason provided'}`,
+        message: `Question "${question.title}" was escalated by the author: ${reason || 'No response received within 24 hours'}`,
         link: `/questions/${question._id}`,
         referenceType: 'Question',
         reference: question._id,
