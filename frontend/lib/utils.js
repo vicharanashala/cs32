@@ -25,3 +25,44 @@ export const getInitials = (name) => {
 };
 
 export const classNames = (...classes) => classes.filter(Boolean).join(' ');
+
+export const stripMarkdown = (text) => {
+  if (!text) return '';
+  return text
+    .replace(/#{1,6}\s?/g, '')
+    .replace(/\*\*(.+?)\*\*/g, '$1')
+    .replace(/\*(.+?)\*/g, '$1')
+    .replace(/`(.+?)`/g, '$1')
+    .replace(/\[(.+?)\]\(.+?\)/g, '$1')
+    .replace(/!\[.*?\]\(.+?\)/g, '')
+    .replace(/\n+/g, ' ')
+    .trim();
+};
+
+export const extractCodeBlocks = (text) => {
+  if (!text) return [];
+  const blocks = [];
+  const regex = /```(\w+)?\n([\s\S]*?)```/g;
+  let match;
+  while ((match = regex.exec(text)) !== null) {
+    blocks.push({ language: match[1] || 'text', code: match[2].trim() });
+  }
+  return blocks;
+};
+
+export const highlightMentions = (text) => {
+  if (!text) return '';
+  return text.replace(/@(\w+)/g, '<span class="text-primary-600 font-medium">@$1</span>');
+};
+
+export const highlightHashtags = (text) => {
+  if (!text) return '';
+  return text.replace(/#(\w+)/g, '<span class="text-primary-600">#$1</span>');
+};
+
+export const readingTime = (text) => {
+  if (!text) return '< 1 min read';
+  const words = text.trim().split(/\s+/).length;
+  const mins = Math.ceil(words / 200);
+  return mins < 1 ? '< 1 min read' : `${mins} min read`;
+};
