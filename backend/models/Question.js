@@ -52,6 +52,7 @@ const questionSchema = new mongoose.Schema({
   escalatedAt: { type: Date },
   escalationReason: { type: String },
   escalatedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  isEscalated: { type: Boolean, default: false },
 
   // Verification / outdated status
   lastVerifiedAt: { type: Date },
