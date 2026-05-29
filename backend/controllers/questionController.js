@@ -448,8 +448,12 @@ exports.escalateQuestion = async (req, res, next) => {
     const { reason } = req.body;
     const question = await Question.findById(req.params.id);
     if (!question) throw new AppError('Question not found', 404);
-    if (question.author.toString() !== req.user._id.toString()) {
-      throw new AppError('Only the author can escalate', 403);
+
+    const isAuthor = question.author.toString() === req.user._id.toString();
+    const isModOrAdmin = req.user.role === 'admin' || req.user.role === 'moderator';
+
+    if (!isAuthor && !isModOrAdmin) {
+      throw new AppError('Only the author or moderators can escalate', 403);
     }
     if (question.isEscalated) {
       throw new AppError('Question already escalated', 400);
@@ -466,7 +470,7 @@ exports.escalateQuestion = async (req, res, next) => {
     const Answer = require('../models/Answer');
     const otherAnswersCount = await Answer.countDocuments({
       question: question._id,
-      author: { $ne: req.user._id },
+      author: { $ne: question.author },
       isDeleted: false,
     });
     if (otherAnswersCount > 0) {
