@@ -181,7 +181,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
       must.push({
         bool: {
           should: [
-            { term: { isFAQ: true } },
+            { bool: { must: [{ term: { isFAQ: true } }, { term: { _index: INDEX_QUESTIONS } }] } },
             { terms: { _index: [INDEX_FAQS, INDEX_USERS] } },
           ],
           minimum_should_match: 1,
