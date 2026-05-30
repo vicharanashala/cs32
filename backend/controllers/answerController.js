@@ -84,7 +84,7 @@ exports.getAnswers = async (req, res, next) => {
           as: 'author',
         },
       },
-      { $unwind: '$author' },
+      { $unwind: { path: '$author', preserveNullAndEmptyArrays: true } },
       {
         $project: {
           body: 1,
