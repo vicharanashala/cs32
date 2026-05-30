@@ -260,7 +260,14 @@ exports.getQuestion = async (req, res, next) => {
 
     const hasMeToo = req.user ? question.meTooUsers.some(u => u.toString() === req.user._id.toString()) : false;
 
-    res.json({ question: { ...question.toObject(), hasMeToo, meTooCount: question.meTooCount } });
+    const responseData = {
+      ...question.toObject(),
+      hasMeToo,
+      meTooCount: question.meTooCount,
+      isOwner: isAuthor,
+    };
+
+    res.json({ question: responseData });
   } catch (err) {
     next(err);
   }

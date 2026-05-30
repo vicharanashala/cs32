@@ -181,11 +181,11 @@ export default function QuestionDetailPage() {
 
   const canEscalate = () => {
     if (!user) return false;
-    const isAuthor = user._id === question.author?._id;
     const isModOrAdmin = user.role === 'admin' || user.role === 'moderator';
-    if (!isAuthor && !isModOrAdmin) return false;
     if (question.isEscalated || question.resolutionStatus === 'escalated') return false;
-    return true;
+    if (isModOrAdmin) return true;
+    if (question.isOwner) return true;
+    return false;
   };
 
   const handleDelete = async () => {
