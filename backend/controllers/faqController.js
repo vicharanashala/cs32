@@ -2,7 +2,7 @@ const { validationResult } = require('express-validator');
 const FAQ = require('../models/FAQ');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPaginationMeta, generateSlug } = require('../utils/helpers');
-const { indexFAQ, deleteFAQIndex } = require('../services/searchService');
+const { indexFAQ, indexFAQItem, deleteFAQIndex, deleteFAQItemIndex } = require('../services/searchService');
 
 exports.createFAQ = async (req, res, next) => {
   try {
@@ -136,6 +136,8 @@ exports.addFAQItem = async (req, res, next) => {
       order: faq.items.length,
     });
     await faq.save();
+    const newItem = faq.items[faq.items.length - 1];
+    await indexFAQItem(faq, newItem);
     res.status(201).json({ faq });
   } catch (err) {
     next(err);
@@ -159,6 +161,7 @@ exports.updateFAQItem = async (req, res, next) => {
     item.reviewedBy = req.user._id;
 
     await faq.save();
+    await indexFAQItem(faq, item);
     res.json({ faq });
   } catch (err) {
     next(err);
@@ -171,6 +174,7 @@ exports.deleteFAQItem = async (req, res, next) => {
     if (!faq) throw new AppError('FAQ not found', 404);
     faq.items.pull({ _id: req.params.itemId });
     await faq.save();
+    await deleteFAQItemIndex(req.params.id, req.params.itemId);
     res.json({ faq });
   } catch (err) {
     next(err);
