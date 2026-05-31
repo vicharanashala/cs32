@@ -6,6 +6,7 @@ import Pagination from '@/components/Pagination';
 import FAQCard from '@/components/FAQCard';
 import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
+import toast from 'react-hot-toast';
 
 function isInputFocused() {
   const active = document.activeElement;
@@ -25,6 +26,10 @@ function FAQsPageContent() {
   const [sort, setSort] = useState(searchParams.get('sort') || 'newest');
   const page = parseInt(searchParams.get('page') || '1');
   const category = searchParams.get('category') || '';
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('📌');
+  const [addingCategory, setAddingCategory] = useState(false);
 
   const fetchSavedFaqs = useCallback(async () => {
     if (!user) return;
@@ -86,6 +91,28 @@ function FAQsPageContent() {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
+  const isAdminOrMod = user && (user.role === 'admin' || user.role === 'moderator');
+
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    setAddingCategory(true);
+    try {
+      await api.post('/categories', { name: newCategoryName.trim(), icon: newCategoryIcon });
+      toast.success('Category added');
+      setShowCategoryModal(false);
+      setNewCategoryName('');
+      setNewCategoryIcon('📌');
+      const all = await api.get('/faqs', { limit: 100, sort: 'newest' });
+      const cats = [...new Set((all.faqs || []).map(f => f.category).filter(Boolean))];
+      setCategories(cats);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setAddingCategory(false);
+    }
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="mb-6">
@@ -136,6 +163,14 @@ function FAQsPageContent() {
             {cat}
           </Link>
         ))}
+        {isAdminOrMod && (
+          <button
+            onClick={() => setShowCategoryModal(true)}
+            className="px-3 py-1.5 text-sm rounded-lg font-medium bg-[var(--color-bg-secondary)] text-[var(--color-primary)] hover:bg-[var(--color-border)] transition-colors"
+          >
+            + Add
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -167,6 +202,55 @@ function FAQsPageContent() {
           </div>
           <Pagination pagination={pagination} basePath="/faqs" queryParams={{ sort: sort !== 'newest' ? { sort } : {}, category }} />
         </>
+      )}
+
+      {/* Add Category Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCategoryModal(false)} />
+          <div className="relative bg-[var(--color-bg-secondary)] rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">Add New Category</h3>
+            <form onSubmit={handleAddCategory}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Category Name</label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g., About the internship"
+                  className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)]"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Icon (emoji)</label>
+                <input
+                  type="text"
+                  value={newCategoryIcon}
+                  onChange={(e) => setNewCategoryIcon(e.target.value)}
+                  placeholder="📌"
+                  className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)]"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(false)}
+                  className="px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingCategory || !newCategoryName.trim()}
+                  className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                >
+                  {addingCategory ? 'Adding...' : 'Add Category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
