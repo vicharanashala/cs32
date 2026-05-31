@@ -8,6 +8,7 @@ const { indexQuestion, deleteQuestionIndex } = require('../services/searchServic
 const { emitToQuestion, emitToUser } = require('../socket');
 const { canDeleteQuestion, hasPermission, PERMISSIONS } = require('../utils/permissions');
 const Notification = require('../models/Notification');
+const { flagContent, clearFlag } = require('../services/moderationService');
 
 exports.createQuestion = async (req, res, next) => {
   try {
@@ -420,6 +421,9 @@ exports.verifyQuestion = async (req, res, next) => {
     const question = await Question.findById(req.params.id);
     if (!question) throw new AppError('Question not found', 404);
     if (!question.isFAQ) throw new AppError('Question is not a resolved FAQ', 400);
+    if (req.user.role !== 'admin' && req.user.role !== 'moderator') {
+      throw new AppError('Not authorized', 403);
+    }
 
     question.lastVerifiedAt = new Date();
     question.verifiedBy = req.user._id;
@@ -431,6 +435,24 @@ exports.verifyQuestion = async (req, res, next) => {
       .populate('verifiedBy', 'username displayName');
 
     res.json({ message: 'FAQ verified', question: populated });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.clearVerifyQuestion = async (req, res, next) => {
+  try {
+    const question = await Question.findById(req.params.id);
+    if (!question) throw new AppError('Question not found', 404);
+    if (req.user.role !== 'admin' && req.user.role !== 'moderator') {
+      throw new AppError('Not authorized', 403);
+    }
+
+    question.lastVerifiedAt = null;
+    question.verifiedBy = null;
+    await question.save();
+
+    res.json({ message: 'FAQ verification cleared', question });
   } catch (err) {
     next(err);
   }
@@ -746,6 +768,39 @@ exports.getMergedQuestions = async (req, res, next) => {
       .populate('author', 'username displayName');
 
     res.json({ mergedQuestions });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const VALID_FLAG_REASONS = ['incorrect', 'incomplete', 'unclear', 'harmful', 'spam', 'other'];
+
+exports.flagQuestion = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !VALID_FLAG_REASONS.includes(reason)) {
+      return res.status(400).json({ error: 'Invalid flag reason', validReasons: VALID_FLAG_REASONS });
+    }
+
+    const question = await Question.findById(req.params.id);
+    if (!question || question.isDeleted) throw new AppError('Question not found', 404);
+
+    await flagContent({ targetType: 'Question', targetId: req.params.id, reason, flaggedBy: req.user._id });
+
+    res.json({ message: 'Question flagged', reason });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.clearFlagQuestion = async (req, res, next) => {
+  try {
+    const question = await Question.findById(req.params.id);
+    if (!question || question.isDeleted) throw new AppError('Question not found', 404);
+
+    await clearFlag({ targetType: 'Question', targetId: req.params.id });
+
+    res.json({ message: 'Question flag cleared' });
   } catch (err) {
     next(err);
   }

@@ -198,6 +198,17 @@ export default function QuestionDetailPage() {
     }
   };
 
+  const handleUnacceptAnswer = async (answerId) => {
+    try {
+      await api.post(`/answers/${answerId}/unaccept`);
+      fetchQuestion();
+      fetchAnswers();
+      toast.success('Answer unaccepted');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const handleEscalate = async () => {
     try {
       await api.patch(`/questions/${id}/escalate`, { reason: escalationReason });
@@ -234,6 +245,16 @@ export default function QuestionDetailPage() {
     try {
       await api.patch(`/questions/${id}/verify`);
       toast.success('FAQ verified');
+      fetchQuestion();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleClearVerify = async () => {
+    try {
+      await api.patch(`/questions/${id}/verify/clear`);
+      toast.success('FAQ verification cleared');
       fetchQuestion();
     } catch (err) {
       toast.error(err.message);
@@ -366,8 +387,11 @@ export default function QuestionDetailPage() {
             {(user?.role === 'admin' || user?.role === 'moderator') && (
               <button onClick={handleDelete} className="btn-danger btn-sm">Delete</button>
             )}
-            {question.isFAQ && (user?.role === 'admin' || user?.role === 'moderator') && (
+            {question.isFAQ && (user?.role === 'admin' || user?.role === 'moderator') && !question.lastVerifiedAt && (
               <button onClick={handleVerify} className="btn-secondary btn-sm">Verify FAQ</button>
+            )}
+            {question.isFAQ && (user?.role === 'admin' || user?.role === 'moderator') && question.lastVerifiedAt && (
+              <button onClick={handleClearVerify} className="btn-secondary btn-sm text-orange-600 border-orange-300 hover:bg-orange-50">Clear Verification</button>
             )}
             {question.isFAQ && (user?.role === 'admin' || user?.role === 'moderator') && (
               <button onClick={() => handleMarkOutdated()} className="btn-secondary btn-sm">Mark Outdated</button>
@@ -528,6 +552,11 @@ export default function QuestionDetailPage() {
                           {(user?.role === 'admin' || user?.role === 'moderator') && !answer.isAccepted && (
                             <button onClick={() => handleAcceptAnswer(answer._id)} className="btn-secondary btn-sm">
                               Accept
+                            </button>
+                          )}
+                          {(user?.role === 'admin' || user?.role === 'moderator' || question.author?._id === user?.id) && answer.isAccepted && (
+                            <button onClick={() => handleUnacceptAnswer(answer._id)} className="btn-secondary btn-sm text-orange-600 border-orange-300 hover:bg-orange-50">
+                              Unaccept
                             </button>
                           )}
                         </div>
