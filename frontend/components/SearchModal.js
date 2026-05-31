@@ -3,21 +3,8 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatDate, truncate } from '@/lib/utils';
+import { useTypewriter } from '@/hooks/useTypewriter';
 import api from '@/lib/api';
-
-const PLACEHOLDER_QUESTIONS = [
-  'Ask a question you have doubts about...',
-  'Search existing questions and answers...',
-  'Find answers in the FAQs section...',
-  'Look up topics by tags...',
-  'Check if your question was already answered...',
-  'Browse questions by category...',
-  'Find an expert answer to your problem...',
-];
-
-let placeholderInterval = null;
-let placeholderIndex = 0;
-let placeholderFading = false;
 
 export default function SearchModal({ isOpen, onClose }) {
   const router = useRouter();
@@ -28,6 +15,7 @@ export default function SearchModal({ isOpen, onClose }) {
   const [selectedIndex, setSelectedIndex] = useState(-1);
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
+  const { text: placeholderText, pause, resume } = useTypewriter();
 
   useEffect(() => {
     if (isOpen && inputRef.current) {
@@ -35,48 +23,19 @@ export default function SearchModal({ isOpen, onClose }) {
       setQuery('');
       setResults([]);
       setSelectedIndex(-1);
-      startPlaceholderRotation();
+      resume();
     } else {
-      stopPlaceholderRotation();
+      pause();
     }
-  }, [isOpen]);
+  }, [isOpen, pause, resume]);
 
-  const startPlaceholderRotation = useCallback(() => {
-    const overlay = document.getElementById('searchPlaceholder');
-    const textEl = document.getElementById('searchPlaceholderText');
-    if (!overlay || !textEl) return;
-
-    const showNext = () => {
-      if (placeholderFading) return;
-      placeholderFading = true;
-      overlay.classList.remove('visible');
-      setTimeout(() => {
-        placeholderIndex = (placeholderIndex + 1) % PLACEHOLDER_QUESTIONS.length;
-        textEl.textContent = PLACEHOLDER_QUESTIONS[placeholderIndex];
-        overlay.classList.add('visible');
-        placeholderFading = false;
-      }, 500);
-    };
-
-    textEl.textContent = PLACEHOLDER_QUESTIONS[0];
-    overlay.classList.add('visible');
-    placeholderInterval = setInterval(showNext, 3000);
-  }, []);
-
-  const stopPlaceholderRotation = useCallback(() => {
-    if (placeholderInterval) {
-      clearInterval(placeholderInterval);
-      placeholderInterval = null;
+  useEffect(() => {
+    if (query.trim()) {
+      pause();
+    } else {
+      resume();
     }
-    const overlay = document.getElementById('searchPlaceholder');
-    if (overlay) overlay.classList.remove('visible');
-  }, []);
-
-  const resetPlaceholderRotation = useCallback(() => {
-    stopPlaceholderRotation();
-    placeholderIndex = 0;
-    startPlaceholderRotation();
-  }, [stopPlaceholderRotation, startPlaceholderRotation]);
+  }, [query, pause, resume]);
 
   useEffect(() => {
     const search = async () => {
@@ -99,14 +58,6 @@ export default function SearchModal({ isOpen, onClose }) {
     const debounce = setTimeout(search, 200);
     return () => clearTimeout(debounce);
   }, [query, type]);
-
-  useEffect(() => {
-    if (query.trim()) {
-      stopPlaceholderRotation();
-    } else if (isOpen) {
-      resetPlaceholderRotation();
-    }
-  }, [query, isOpen]);
 
   const handleKeyDown = useCallback((e) => {
     if (e.key === 'ArrowDown') {
@@ -175,9 +126,11 @@ export default function SearchModal({ isOpen, onClose }) {
                   onKeyDown={handleKeyDown}
                   className="w-full h-full text-lg outline-none bg-transparent text-[var(--color-text)] relative z-10"
                 />
-                <div className="search-placeholder-overlay" id="searchPlaceholder">
-                  <span className="search-placeholder-text" id="searchPlaceholderText"></span>
-                </div>
+                {!query && (
+                  <span className="absolute inset-0 flex items-center text-lg text-[var(--color-text-secondary)] pointer-events-none overflow-hidden whitespace-nowrap">
+                    {placeholderText}
+                  </span>
+                )}
               </div>
               {loading && (
                 <svg className="animate-spin w-5 h-5 text-[var(--color-text-secondary)]" fill="none" viewBox="0 0 24 24">
