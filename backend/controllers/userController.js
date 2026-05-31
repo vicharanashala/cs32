@@ -67,6 +67,35 @@ exports.getUserAnswers = async (req, res, next) => {
   }
 };
 
+exports.getMeTooQuestions = async (req, res, next) => {
+  try {
+    const { page, limit, skip } = paginate(req.query.page, req.query.limit);
+    const filter = { meTooUsers: req.user._id, isDeleted: false };
+    const [questions, total] = await Promise.all([
+      Question.find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .populate('author', 'username displayName avatar reputation')
+        .populate('tags', 'name color'),
+      Question.countDocuments(filter),
+    ]);
+
+    res.json({ questions, pagination: buildPaginationMeta(total, page, limit) });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.completeOnboarding = async (req, res, next) => {
+  try {
+    await User.findByIdAndUpdate(req.user._id, { hasCompletedOnboarding: true });
+    res.json({ message: 'Onboarding completed' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.saveQuestion = async (req, res, next) => {
   try {
     const { questionId } = req.body;

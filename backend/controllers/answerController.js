@@ -8,6 +8,7 @@ const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPaginationMeta } = require('../utils/helpers');
 const { emitToUser, emitToQuestion } = require('../socket');
 const { indexQuestion } = require('../services/searchService');
+const { flagContent, clearFlag } = require('../services/moderationService');
 
 exports.createAnswer = async (req, res, next) => {
   try {
@@ -159,7 +160,8 @@ exports.acceptAnswer = async (req, res, next) => {
 
     const question = await Question.findById(answer.question);
     if (!question) throw new AppError('Question not found', 404);
-    if (question.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (question.author.toString() !== req.user._id.toString() &&
+        req.user.role !== 'admin' && req.user.role !== 'moderator') {
       throw new AppError('Not authorized', 403);
     }
 
@@ -217,6 +219,44 @@ exports.acceptAnswer = async (req, res, next) => {
   }
 };
 
+exports.unacceptAnswer = async (req, res, next) => {
+  try {
+    const answer = await Answer.findById(req.params.id);
+    if (!answer) throw new AppError('Answer not found', 404);
+
+    const question = await Question.findById(answer.question);
+    if (!question) throw new AppError('Question not found', 404);
+    if (question.author.toString() !== req.user._id.toString() &&
+        req.user.role !== 'admin' && req.user.role !== 'moderator') {
+      throw new AppError('Not authorized', 403);
+    }
+
+    if (question.acceptedAnswer?.toString() !== answer._id.toString()) {
+      throw new AppError('This answer is not the accepted answer', 400);
+    }
+
+    answer.isAccepted = false;
+    await answer.save();
+
+    question.acceptedAnswer = null;
+    question.isFAQ = false;
+    question.resolvedAt = null;
+    await question.save();
+
+    const populatedQuestion = await Question.findById(question._id)
+      .populate('author', 'username displayName avatar reputation')
+      .populate('tags', 'name color');
+    await indexQuestion(populatedQuestion);
+
+    // Remove reputation reward
+    await User.findByIdAndUpdate(answer.author, { $inc: { reputation: -15 } });
+
+    res.json({ answer, message: 'Answer unaccepted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.toggleSolvedMyDoubt = async (req, res, next) => {
   try {
     const answer = await Answer.findById(req.params.id);
@@ -244,6 +284,39 @@ exports.toggleSolvedMyDoubt = async (req, res, next) => {
       solvedMyDoubtCount: answer.solvedMyDoubtCount,
       hasSolvedMyDoubt: !alreadySolved,
     });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const VALID_FLAG_REASONS = ['incorrect', 'incomplete', 'unclear', 'harmful', 'spam', 'other'];
+
+exports.flagAnswer = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !VALID_FLAG_REASONS.includes(reason)) {
+      return res.status(400).json({ error: 'Invalid flag reason', validReasons: VALID_FLAG_REASONS });
+    }
+
+    const answer = await Answer.findById(req.params.id);
+    if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
+
+    await flagContent({ targetType: 'Answer', targetId: req.params.id, reason, flaggedBy: req.user._id });
+
+    res.json({ message: 'Answer flagged', reason });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.clearFlagAnswer = async (req, res, next) => {
+  try {
+    const answer = await Answer.findById(req.params.id);
+    if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
+
+    await clearFlag({ targetType: 'Answer', targetId: req.params.id });
+
+    res.json({ message: 'Answer flag cleared' });
   } catch (err) {
     next(err);
   }

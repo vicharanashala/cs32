@@ -1,5 +1,6 @@
 const router = require('express').Router();
 const { auth, optionalAuth, moderatorOrAdmin } = require('../middleware/auth');
+const { feedbackLimiter } = require('../middleware/rateLimiter');
 const ctrl = require('../controllers/faqController');
 const { reindexAllFAQs } = require('../services/searchService');
 const FAQ = require('../models/FAQ');
@@ -13,7 +14,7 @@ router.delete('/:id', auth, moderatorOrAdmin, ctrl.deleteFAQ);
 router.post('/:id/items', auth, moderatorOrAdmin, ctrl.addFAQItem);
 router.put('/:id/items/:itemId', auth, moderatorOrAdmin, ctrl.updateFAQItem);
 router.delete('/:id/items/:itemId', auth, moderatorOrAdmin, ctrl.deleteFAQItem);
-router.post('/:id/items/:itemId/feedback', optionalAuth, ctrl.markFAQHelpful);
+router.post('/:id/items/:itemId/feedback', optionalAuth, feedbackLimiter, ctrl.markFAQHelpful);
 
 router.post('/reindex', auth, moderatorOrAdmin, async (req, res) => {
   try {

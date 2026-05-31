@@ -15,10 +15,18 @@ export default function FAQDetailPage() {
   const [loading, setLoading] = useState(true);
   const [activeItem, setActiveItem] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
+  const [localVotes, setLocalVotes] = useState({});
 
   useEffect(() => {
     api.get(`/faqs/${slug}`)
-      .then(data => setFaq(data.faq))
+      .then(data => {
+        setFaq(data.faq);
+        const votes = {};
+        data.faq.items.forEach(item => {
+          if (item.userVote) votes[item._id] = item.userVote;
+        });
+        setLocalVotes(votes);
+      })
       .catch(() => toast.error('FAQ not found'))
       .finally(() => setLoading(false));
   }, [slug]);
@@ -54,8 +62,23 @@ export default function FAQDetailPage() {
   };
 
   const handleFeedback = async (itemId, helpful) => {
+    if (!user) { toast.error('Please login to vote'); return; }
+    const currentVote = localVotes[itemId];
+    if (currentVote === (helpful ? 'helpful' : 'notHelpful')) {
+      toast.error('You have already voted');
+      return;
+    }
     try {
-      await api.post(`/faqs/${faq._id}/items/${itemId}/feedback`, { helpful });
+      const data = await api.post(`/faqs/${faq._id}/items/${itemId}/feedback`, { helpful });
+      setLocalVotes(prev => ({ ...prev, [itemId]: helpful ? 'helpful' : 'notHelpful' }));
+      setFaq(prev => ({
+        ...prev,
+        items: prev.items.map(item =>
+          item._id === itemId
+            ? { ...item, helpfulCount: data.helpfulCount, notHelpfulCount: data.notHelpfulCount }
+            : item
+        )
+      }));
       toast.success(helpful ? 'Glad this helped!' : 'Thanks for the feedback');
     } catch (err) {
       toast.error(err.message);
@@ -144,11 +167,17 @@ export default function FAQDetailPage() {
             )}
             <div className="flex items-center gap-4 mt-4 pt-3 border-t border-[var(--color-border)] text-xs text-[var(--color-text-secondary)]">
               <span>Was this helpful?</span>
-              <button onClick={() => handleFeedback(item._id, true)} className="flex items-center gap-1 hover:text-green-600">
+              <button
+                onClick={() => handleFeedback(item._id, true)}
+                className={`flex items-center gap-1 ${localVotes[item._id] === 'helpful' ? 'text-green-600 font-semibold' : 'hover:text-green-600'}`}
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" /></svg>
                 Yes ({item.helpfulCount || 0})
               </button>
-              <button onClick={() => handleFeedback(item._id, false)} className="flex items-center gap-1 hover:text-red-600">
+              <button
+                onClick={() => handleFeedback(item._id, false)}
+                className={`flex items-center gap-1 ${localVotes[item._id] === 'notHelpful' ? 'text-red-600 font-semibold' : 'hover:text-red-600'}`}
+              >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" /></svg>
                 No ({item.notHelpfulCount || 0})
               </button>

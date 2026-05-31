@@ -110,3 +110,60 @@
     @apply prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-700 prose-a:text-primary-600 prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded dark:prose-headings:text-gray-100 dark:prose-p:text-gray-300 dark:prose-a:text-primary-400 dark:prose-code:bg-gray-800 dark:prose-code:text-gray-100;
   }
 }
+
+/* ── Rotating Search Placeholder ────────────────────────────── */
+.search-placeholder-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+.search-placeholder-overlay.visible {
+  opacity: 1;
+}
+
+.search-placeholder-text {
+  font-size: 1.125rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Rotating Navbar Search Placeholder ────────────────────── */
+.navbar-search-placeholder-overlay {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  padding-left: 1rem;
+  border-radius: 0.375rem;
+}
+
+.navbar-search-placeholder-overlay.visible {
+  opacity: 1;
+}
+
+.navbar-search-placeholder-text {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 3rem;
+}

@@ -13,11 +13,13 @@ export default function SavedPage() {
   const [tab, setTab] = useState('questions');
   const [savedQuestions, setSavedQuestions] = useState([]);
   const [savedFaqs, setSavedFaqs] = useState([]);
+  const [meTooQuestions, setMeTooQuestions] = useState([]);
   const [questionTags, setQuestionTags] = useState([]);
   const [faqTags, setFaqTags] = useState([]);
   const [selectedTag, setSelectedTag] = useState('');
   const [questionPagination, setQuestionPagination] = useState(null);
   const [faqPagination, setFaqPagination] = useState(null);
+  const [meTooPagination, setMeTooPagination] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
   const [editNotes, setEditNotes] = useState('');
@@ -64,6 +66,19 @@ export default function SavedPage() {
     } catch (_) {}
   }, []);
 
+  const fetchMeTooQuestions = useCallback(async (page = 1) => {
+    setLoading(true);
+    try {
+      const data = await api.get('/users/me/me-too', { page });
+      setMeTooQuestions(data.questions || []);
+      setMeTooPagination(data.pagination);
+    } catch (err) {
+      toast.error('Failed to load Me Too questions');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     if (!user) {
       router.push('/auth?mode=login');
@@ -71,11 +86,13 @@ export default function SavedPage() {
     }
     if (tab === 'questions') {
       fetchSavedQuestions(selectedTag);
-    } else {
+    } else if (tab === 'faqs') {
       fetchSavedFaqs(selectedTag);
+    } else if (tab === 'me-too') {
+      fetchMeTooQuestions();
     }
     fetchTags();
-  }, [user, router, tab, selectedTag, fetchSavedQuestions, fetchSavedFaqs, fetchTags]);
+  }, [user, router, tab, selectedTag, fetchSavedQuestions, fetchSavedFaqs, fetchTags, fetchMeTooQuestions]);
 
   const handleUnsaveQuestion = async (questionId, e) => {
     e.preventDefault();
@@ -96,6 +113,18 @@ export default function SavedPage() {
       await api.delete(`/users/me/saved/faqs/${faqId}`);
       setSavedFaqs(prev => prev.filter(s => s.faq?._id !== faqId));
       toast.success('FAQ removed from saved');
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
+  const handleRemoveMeToo = async (questionId, e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await api.patch(`/questions/${questionId}/me-too`);
+      setMeTooQuestions(prev => prev.filter(q => q._id !== questionId));
+      toast.success('Removed from Me Too list');
     } catch (err) {
       toast.error(err.message);
     }
@@ -145,9 +174,9 @@ export default function SavedPage() {
     }
   };
 
-  const currentTags = tab === 'questions' ? questionTags : faqTags;
-  const currentSaved = tab === 'questions' ? savedQuestions : savedFaqs;
-  const currentPagination = tab === 'questions' ? questionPagination : faqPagination;
+  const currentTags = tab === 'me-too' ? [] : (tab === 'questions' ? questionTags : faqTags);
+  const currentSaved = tab === 'me-too' ? meTooQuestions : (tab === 'questions' ? savedQuestions : savedFaqs);
+  const currentPagination = tab === 'me-too' ? meTooPagination : (tab === 'questions' ? questionPagination : faqPagination);
 
   const renderSavedItem = (item, isFAQ) => {
     const target = isFAQ ? item.faq : item.question;
@@ -245,12 +274,63 @@ export default function SavedPage() {
     );
   };
 
+  const renderMeTooItem = (question) => {
+    const link = `/questions/${question._id}`;
+    return (
+      <div key={question._id} className="card-hover p-4 sm:p-6">
+        <div className="flex items-start gap-4">
+          <div className="flex-1 min-w-0">
+            <Link href={link} className="block">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="badge-blue text-xs">Me Too</span>
+                {question.meTooCount > 1 && (
+                  <span className="text-xs text-[var(--color-text-secondary)]">{question.meTooCount} people also</span>
+                )}
+              </div>
+              <h3 className="text-base font-semibold text-[var(--color-text)] hover:text-primary-600 mb-1">
+                {question.title}
+              </h3>
+              {question.body && (
+                <p className="text-sm text-[var(--color-text-secondary)] line-clamp-2 mb-2">
+                  {question.body.slice(0, 200)}
+                </p>
+              )}
+              {question.tagNames?.length > 0 && (
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {question.tagNames.map(tag => (
+                    <span key={tag} className="badge-gray text-xs">{tag}</span>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-3 text-xs text-[var(--color-text-secondary)]">
+                <span>{question.answerCount || 0} answers</span>
+                <span>{question.upvotes || 0} votes</span>
+                <span>Added {formatDate(question.createdAt)}</span>
+              </div>
+            </Link>
+          </div>
+          <button
+            onClick={(e) => handleRemoveMeToo(question._id, e)}
+            className="p-1.5 text-[var(--color-text-secondary)] hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded"
+            title="Remove from Me Too"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!user) return null;
 
-  return (
+return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-[var(--color-text)]">Saved</h1>
+        <h1 className="text-2xl font-bold text-[var(--color-text)]">
+          {tab === 'me-too' ? 'Me Too List' : 'Saved Items'}
+        </h1>
         <Link href="/questions" className="btn-secondary btn-sm">Browse Questions</Link>
       </div>
 
@@ -271,6 +351,14 @@ export default function SavedPage() {
           }`}
         >
           FAQs
+        </button>
+        <button
+          onClick={() => { setTab('me-too'); setSelectedTag(''); }}
+          className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+            tab === 'me-too' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+          }`}
+        >
+          Me Too
         </button>
       </div>
 
@@ -310,9 +398,15 @@ export default function SavedPage() {
         </div>
       ) : currentSaved.length === 0 ? (
         <div className="card p-12 text-center">
-          <h3 className="text-lg font-medium text-[var(--color-text)] mb-2">No saved {tab}</h3>
-          <p className="text-[var(--color-text-secondary)]">Save {tab} to reference them later</p>
+          <h3 className="text-lg font-medium text-[var(--color-text)] mb-2">No {tab === 'me-too' ? 'Me Too questions' : `saved ${tab}`}</h3>
+          <p className="text-[var(--color-text-secondary)]">
+            {tab === 'me-too' ? 'Mark questions as "Me Too" to show interest' : `Save ${tab} to reference them later`}
+          </p>
           <Link href={tab === 'questions' ? '/questions' : '/faqs'} className="btn-primary mt-4">Browse {tab}</Link>
+        </div>
+      ) : tab === 'me-too' ? (
+        <div className="space-y-4">
+          {meTooQuestions.map(q => renderMeTooItem(q))}
         </div>
       ) : (
         <div className="space-y-4">
@@ -325,7 +419,11 @@ export default function SavedPage() {
           {Array.from({ length: currentPagination.totalPages }, (_, i) => (
             <button
               key={i + 1}
-              onClick={() => tab === 'questions' ? fetchSavedQuestions(selectedTag, i + 1) : fetchSavedFaqs(selectedTag, i + 1)}
+              onClick={() => {
+                if (tab === 'me-too') fetchMeTooQuestions(i + 1);
+                else if (tab === 'questions') fetchSavedQuestions(selectedTag, i + 1);
+                else fetchSavedFaqs(selectedTag, i + 1);
+              }}
               className={`px-3 py-1 text-sm rounded ${
                 currentPagination.page === i + 1 ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
               }`}

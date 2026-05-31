@@ -1,9 +1,21 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import { useTheme } from '@/context/ThemeContext';
 import { getInitials } from '@/lib/utils';
+
+const NAVBAR_PLACEHOLDER_QUESTIONS = [
+  'Search questions and answers...',
+  'Find FAQs on your topic...',
+  'Look up tags...',
+  'Find experts in the community...',
+  'Check answered questions...',
+];
+
+let navbarPlaceholderInterval = null;
+let navbarPlaceholderIndex = 0;
+let navbarPlaceholderFading = false;
 
 export default function Navbar({ onSearch }) {
   const { user, logout } = useAuth();
@@ -11,6 +23,51 @@ export default function Navbar({ onSearch }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const navbarInputRef = useRef(null);
+
+  const startNavbarPlaceholderRotation = useCallback(() => {
+    const overlay = document.getElementById('navbarSearchPlaceholder');
+    const textEl = document.getElementById('navbarSearchPlaceholderText');
+    if (!overlay || !textEl) return;
+
+    const showNext = () => {
+      if (navbarPlaceholderFading) return;
+      navbarPlaceholderFading = true;
+      overlay.classList.remove('visible');
+      setTimeout(() => {
+        navbarPlaceholderIndex = (navbarPlaceholderIndex + 1) % NAVBAR_PLACEHOLDER_QUESTIONS.length;
+        textEl.textContent = NAVBAR_PLACEHOLDER_QUESTIONS[navbarPlaceholderIndex];
+        overlay.classList.add('visible');
+        navbarPlaceholderFading = false;
+      }, 500);
+    };
+
+    textEl.textContent = NAVBAR_PLACEHOLDER_QUESTIONS[0];
+    overlay.classList.add('visible');
+    navbarPlaceholderInterval = setInterval(showNext, 3000);
+  }, []);
+
+  const stopNavbarPlaceholderRotation = useCallback(() => {
+    if (navbarPlaceholderInterval) {
+      clearInterval(navbarPlaceholderInterval);
+      navbarPlaceholderInterval = null;
+    }
+    const overlay = document.getElementById('navbarSearchPlaceholder');
+    if (overlay) overlay.classList.remove('visible');
+  }, []);
+
+  useEffect(() => {
+    startNavbarPlaceholderRotation();
+    return () => stopNavbarPlaceholderRotation();
+  }, [startNavbarPlaceholderRotation, stopNavbarPlaceholderRotation]);
+
+  useEffect(() => {
+    if (searchQuery.trim()) {
+      stopNavbarPlaceholderRotation();
+    } else {
+      startNavbarPlaceholderRotation();
+    }
+  }, [searchQuery, startNavbarPlaceholderRotation, stopNavbarPlaceholderRotation]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -42,15 +99,20 @@ export default function Navbar({ onSearch }) {
           </div>
 
           <div className="hidden md:flex items-center flex-1 max-w-lg mx-4">
-            <form onSubmit={handleSearch} className="w-full relative">
-              <input
-                type="text"
-                placeholder="Search questions, FAQs, tags..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full px-4 py-2 border border-[var(--color-border)] rounded-lg text-sm bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              />
-              <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden lg:inline-flex items-center px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)] bg-gray-100 dark:bg-gray-700 rounded">/</kbd>
+            <form onSubmit={handleSearch} className="w-full">
+              <div className="relative w-full" style={{ height: '38px' }}>
+                <input
+                  ref={navbarInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full h-full px-4 py-2 pr-10 border border-[var(--color-border)] rounded-lg text-sm bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+                />
+                <div className="navbar-search-placeholder-overlay" id="navbarSearchPlaceholder">
+                  <span className="navbar-search-placeholder-text" id="navbarSearchPlaceholderText"></span>
+                </div>
+                <kbd className="absolute right-3 top-1/2 -translate-y-1/2 hidden lg:inline-flex items-center px-1.5 py-0.5 text-xs text-[var(--color-text-secondary)] bg-gray-100 dark:bg-gray-700 rounded">/</kbd>
+              </div>
             </form>
           </div>
 
