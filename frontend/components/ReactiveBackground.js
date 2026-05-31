@@ -1,13 +1,15 @@
 'use client';
 import { useEffect, useRef, useCallback } from 'react';
 
-const PARTICLE_COUNT = 1000;
+const PARTICLE_COUNT = 1500;
 const PARTICLE_RADIUS = 2;
 const ATTRACTION_RADIUS = 200;
 const REPULSION_RADIUS = 60;
 const BASE_SPEED = 0.8;
 const ATTRACTION_STRENGTH = 0.25;
 const REPULSION_STRENGTH = 0.4;
+const FLEE_RADIUS = 150;
+const FLEE_STRENGTH = 0.4;
 
 function createParticle(width, height) {
   return {
@@ -24,7 +26,7 @@ function createParticle(width, height) {
 export default function ReactiveBackground() {
   const canvasRef = useRef(null);
   const particlesRef = useRef([]);
-  const mouseRef = useRef({ x: -1000, y: -1000 });
+  const mouseRef = useRef({ x: -1000, y: -1000, vx: 0, vy: 0 });
   const animationRef = useRef(null);
 
   const resize = useCallback(() => {
@@ -49,7 +51,7 @@ export default function ReactiveBackground() {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-    const { x: mx, y: my } = mouseRef.current;
+    const { x: mx, y: my, vx: mvx, vy: mvy } = mouseRef.current;
 
     for (const p of particlesRef.current) {
       const dx = mx - p.x;
@@ -64,6 +66,12 @@ export default function ReactiveBackground() {
         const force = (REPULSION_RADIUS - dist) / REPULSION_RADIUS * REPULSION_STRENGTH;
         p.vx -= (dx / dist) * force;
         p.vy -= (dy / dist) * force;
+      } else if (dist < FLEE_RADIUS && dist > ATTRACTION_RADIUS && (Math.abs(mvx) > 0.5 || Math.abs(mvy) > 0.5)) {
+        const fleeForce = (FLEE_RADIUS - dist) / FLEE_RADIUS * FLEE_STRENGTH;
+        const moveDirX = mvx !== 0 ? Math.sign(mvx) : (p.x < mx ? -1 : 1);
+        const moveDirY = mvy !== 0 ? Math.sign(mvy) : (p.y < my ? -1 : 1);
+        p.vx += moveDirX * fleeForce;
+        p.vy += moveDirY * fleeForce;
       }
 
       p.vx += (p.baseVx - p.vx) * 0.03;
@@ -111,7 +119,13 @@ const isDark = document.documentElement.classList.contains('dark');
     draw();
 
     const handleMouseMove = (e) => {
-      mouseRef.current = { x: e.clientX, y: e.clientY };
+      const prev = mouseRef.current;
+      mouseRef.current = {
+        x: e.clientX,
+        y: e.clientY,
+        vx: e.clientX - prev.x,
+        vy: e.clientY - prev.y,
+      };
     };
 
     const handleMouseLeave = () => {
