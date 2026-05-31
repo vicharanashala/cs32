@@ -83,8 +83,8 @@ export default function ReactiveBackground() {
       if (p.y < 0) { p.y = canvas.height; p.baseVy = Math.abs(p.baseVy); }
       if (p.y > canvas.height) { p.y = 0; p.baseVy = -Math.abs(p.baseVy); }
 
-      const isDark = document.documentElement.classList.contains('dark');
-      const baseColor = isDark ? [139, 92, 246] : [99, 102, 241];
+const isDark = document.documentElement.classList.contains('dark');
+    const baseColor = isDark ? [199, 175, 255] : [99, 102, 241];
       const alpha = 0.4;
 
       ctx.beginPath();
