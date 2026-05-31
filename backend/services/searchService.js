@@ -217,12 +217,16 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
     const must = [];
     const filter = [];
 
+    // Strict tab routing: each tab targets only its own index/indices
     let indices;
-    if (type === 'faqs') {
+    if (type === 'questions') {
+      indices = INDEX_QUESTIONS;
+    } else if (type === 'faqs') {
       indices = [INDEX_FAQS, INDEX_FAQ_ITEMS];
     } else if (type === 'users') {
       indices = INDEX_USERS;
     } else {
+      // "All" tab: search across all indices
       indices = [INDEX_QUESTIONS, INDEX_FAQS, INDEX_FAQ_ITEMS, INDEX_USERS];
     }
 
@@ -232,6 +236,15 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
           multi_match: {
             query,
             fields: ['username^3', 'displayName^2', 'bio'],
+            type: 'best_fields',
+            fuzziness: 'AUTO',
+          },
+        });
+      } else if (type === 'questions') {
+        must.push({
+          multi_match: {
+            query,
+            fields: ['title^3', 'body^2', 'tags', 'authorName'],
             type: 'best_fields',
             fuzziness: 'AUTO',
           },
@@ -246,10 +259,11 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
           },
         });
       } else {
+        // "All" tab: fuzzy search across all field names from every index
         must.push({
           multi_match: {
             query,
-            fields: ['title^3', 'body^2', 'question^4', 'answer', 'description', 'tags', 'username^2', 'displayName', 'bio'],
+            fields: ['title^3', 'body^2', 'question^4', 'answer', 'description', 'tags', 'username^2', 'displayName', 'bio', 'authorName'],
             type: 'best_fields',
             fuzziness: 'AUTO',
           },
@@ -261,18 +275,35 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
       filter.push({ terms: { tags } });
     }
 
-    if (!type || (type !== 'faqs' && type !== 'users')) {
-      must.push({
+    // Per-tab visibility filters (only restrict what must be restricted)
+    if (type === 'faqs') {
+      // FAQ tab: only show published FAQ items
+      filter.push({
         bool: {
           should: [
-            { bool: { must: [{ term: { isFAQ: true } }, { term: { _index: INDEX_QUESTIONS } }] } },
-            { terms: { _index: [INDEX_FAQS, INDEX_USERS] } },
+            { term: { _index: INDEX_FAQS } },
+            { bool: { must: [{ term: { isPublished: true } }, { term: { _index: INDEX_FAQ_ITEMS } }] } },
+          ],
+          minimum_should_match: 1,
+        },
+      });
+    } else if (!type || type === '') {
+      // "All" tab: show all questions (regardless of isFAQ), all FAQs, all users,
+      // but only show published FAQ items
+      filter.push({
+        bool: {
+          should: [
+            { term: { _index: INDEX_QUESTIONS } },
+            { term: { _index: INDEX_FAQS } },
+            { term: { _index: INDEX_USERS } },
             { bool: { must: [{ term: { isPublished: true } }, { term: { _index: INDEX_FAQ_ITEMS } }] } },
           ],
           minimum_should_match: 1,
         },
       });
     }
+    // "questions" and "users" tabs don't need extra filters —
+    // they already target a single index
 
     const body = {
       from: (page - 1) * limit,
@@ -291,8 +322,22 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
     }
 
     const result = await es.search({ index: indices, body });
+
+    // Map ES index names to frontend type labels
+    const indexToType = {
+      [INDEX_QUESTIONS]: 'question',
+      [INDEX_FAQS]: 'faq',
+      [INDEX_FAQ_ITEMS]: 'faq',
+      [INDEX_USERS]: 'user',
+    };
+
     return {
-      results: result.hits.hits.map(h => ({ id: h._id, ...h._source, score: h._score })),
+      results: result.hits.hits.map(h => ({
+        id: h._id,
+        ...h._source,
+        _type: indexToType[h._index] || 'unknown',
+        score: h._score,
+      })),
       total: result.hits.total.value,
       page,
       limit,
@@ -326,6 +371,63 @@ const reindexAllFAQs = async (faqs) => {
   console.log(`Reindexed ${faqs.length} FAQs with items`);
 };
 
+const syncToElasticsearch = async () => {
+  try {
+    const es = getES();
+    const Question = require('../models/Question');
+    const FAQ = require('../models/FAQ');
+    const User = require('../models/User');
+
+    // Check if ES indices are empty while MongoDB has data
+    const [qCount, fCount, uCount] = await Promise.all([
+      es.count({ index: INDEX_QUESTIONS }).then(r => r.count).catch(() => 0),
+      es.count({ index: INDEX_FAQS }).then(r => r.count).catch(() => 0),
+      es.count({ index: INDEX_USERS }).then(r => r.count).catch(() => 0),
+    ]);
+
+    const [mongoQuestions, mongoFaqs, mongoUsers] = await Promise.all([
+      Question.countDocuments({ isDeleted: false }),
+      FAQ.countDocuments(),
+      User.countDocuments(),
+    ]);
+
+    if (qCount === 0 && mongoQuestions > 0) {
+      console.log(`Syncing ${mongoQuestions} questions to Elasticsearch...`);
+      const questions = await Question.find({ isDeleted: false })
+        .populate('author', 'username displayName avatar reputation')
+        .populate('tags', 'name color');
+      for (const q of questions) {
+        await indexQuestion(q);
+      }
+      console.log(`Synced ${questions.length} questions`);
+    }
+
+    if (fCount === 0 && mongoFaqs > 0) {
+      console.log(`Syncing ${mongoFaqs} FAQs to Elasticsearch...`);
+      const faqs = await FAQ.find();
+      for (const faq of faqs) {
+        await indexFAQ(faq);
+      }
+      console.log(`Synced ${faqs.length} FAQs with items`);
+    }
+
+    if (uCount === 0 && mongoUsers > 0) {
+      console.log(`Syncing ${mongoUsers} users to Elasticsearch...`);
+      const users = await User.find();
+      for (const u of users) {
+        await indexUser(u);
+      }
+      console.log(`Synced ${users.length} users`);
+    }
+
+    if (qCount > 0 && fCount > 0 && uCount > 0) {
+      console.log('Elasticsearch already in sync');
+    }
+  } catch (err) {
+    console.error('ES sync error:', err.message);
+  }
+};
+
 module.exports = {
   initIndices,
   indexQuestion,
@@ -338,4 +440,5 @@ module.exports = {
   deleteFAQItemIndex,
   deleteFAQItemsByFAQId,
   reindexAllFAQs,
+  syncToElasticsearch,
 };

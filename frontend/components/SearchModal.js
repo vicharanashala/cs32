@@ -57,8 +57,8 @@ export default function SearchModal({ isOpen, onClose }) {
       e.preventDefault();
       if (selectedIndex >= 0 && results[selectedIndex]) {
         const result = results[selectedIndex];
-        const typeLabel = result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user';
-        const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.slug || result.id}` : `/users/${result.username}`;
+        const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');
+        const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.faqId || result.slug || result.id}` : `/users/${result.username}`;
         router.push(link);
         onClose();
       } else if (query.trim()) {
@@ -88,8 +88,8 @@ export default function SearchModal({ isOpen, onClose }) {
   if (!isOpen) return null;
 
   const handleResultClick = (result) => {
-    const typeLabel = result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user';
-    const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.slug || result.id}` : `/users/${result.username}`;
+    const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');
+    const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.faqId || result.slug || result.id}` : `/users/${result.username}`;
     router.push(link);
     onClose();
   };
@@ -140,10 +140,10 @@ export default function SearchModal({ isOpen, onClose }) {
             {results.length > 0 ? (
               <ul className="py-2">
                 {results.map((result, index) => {
-                  const typeLabel = result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user';
-                  const title = result.title || result.displayName || result.username || 'Untitled';
-                  const desc = result.body || result.description || result.bio || '';
-                  const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.slug || result.id}` : `/users/${result.username}`;
+                  const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');
+                  const title = result.title || result.question || result.faqTitle || result.displayName || result.username || 'Untitled';
+                  const desc = result.body || result.description || result.answer || result.bio || '';
+                  const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.faqId || result.slug || result.id}` : `/users/${result.username}`;
 
                   return (
                     <li key={result.id}>

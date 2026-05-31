@@ -116,10 +116,10 @@ function SearchPageContent() {
           {total > 0 && <p className="text-sm text-[var(--color-text-secondary)] mb-4">{total} results found</p>}
           <div className="space-y-4">
             {results.map((result) => {
-              const typeLabel = result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user';
-              const title = result.title || result.displayName || result.username || 'Untitled';
-              const desc = result.body || result.description || result.bio || '';
-              const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.slug || result.id}` : `/users/${result.username}`;
+              const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');
+              const title = result.title || result.question || result.faqTitle || result.displayName || result.username || 'Untitled';
+              const desc = result.body || result.description || result.answer || result.bio || '';
+              const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.faqId || result.slug || result.id}` : `/users/${result.username}`;
 
               return (
                 <Link key={result.id} href={link} className="card-hover p-4 block">
