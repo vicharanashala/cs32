@@ -124,7 +124,6 @@
   z-index: 0;
   opacity: 0;
   transition: opacity 0.5s ease;
-  margin-left: 2px;
 }
 
 .search-placeholder-overlay.visible {
@@ -137,5 +136,34 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  padding-right: 2rem;
+}
+
+/* ── Rotating Navbar Search Placeholder ────────────────────── */
+.navbar-search-placeholder-overlay {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  padding-left: 1rem;
+  border-radius: 0.375rem;
+}
+
+.navbar-search-placeholder-overlay.visible {
+  opacity: 1;
+}
+
+.navbar-search-placeholder-text {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding-right: 3rem;
 }
