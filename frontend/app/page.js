@@ -1,8 +1,9 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import api from '@/lib/api';
-import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
+import { useAuth } from '@/context/AuthContext';
 
 const CATEGORY_ICONS = {
   'About the internship': '💼',
@@ -23,14 +24,13 @@ const CATEGORY_ICONS = {
 };
 
 export default function HomePage() {
-  const router = useRouter();
+  const { user } = useAuth();
   const [faqs, setFaqs] = useState([]);
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All Categories');
   const [expandedFaq, setExpandedFaq] = useState(null);
-  const [activeTab, setActiveTab] = useState('faq');
-  const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
+  const [localVotes, setLocalVotes] = useState({});
 
   useEffect(() => {
     loadFAQs();
@@ -66,38 +66,33 @@ export default function HomePage() {
     ? faqs
     : faqs.filter(faq => faq.category === selectedCategory);
 
-  const handleSearch = useCallback((e) => {
-    e?.preventDefault();
-    if (searchQuery.trim()) {
-      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
-    }
-  }, [searchQuery, router]);
-
-  const handleKeyDown = useCallback((e) => {
-    if (e.key === '/' && !['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) {
-      e.preventDefault();
-      document.querySelector('.search-input')?.focus();
-    }
-    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
-      e.preventDefault();
-      document.querySelector('.search-input')?.focus();
-    }
-  }, []);
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleKeyDown]);
-
   const toggleFaq = (faqId) => {
     setExpandedFaq(expandedFaq === faqId ? null : faqId);
   };
 
   const handleFeedback = async (faqId, itemId, helpful) => {
+    if (!user) { toast.error('Please login to vote'); return; }
+    const currentVote = localVotes[itemId];
+    if (currentVote === (helpful ? 'helpful' : 'notHelpful')) {
+      toast.error('You have already voted');
+      return;
+    }
     try {
-      await api.post(`/faqs/${faqId}/items/${itemId}/feedback`, { helpful });
+      const data = await api.post(`/faqs/${faqId}/items/${itemId}/feedback`, { helpful });
+      setLocalVotes(prev => ({ ...prev, [itemId]: helpful ? 'helpful' : 'notHelpful' }));
+      setFaqs(prev => prev.map(faq => {
+        if (faq._id !== faqId) return faq;
+        return {
+          ...faq,
+          items: faq.items.map(item => {
+            if (item._id !== itemId) return item;
+            return { ...item, helpfulCount: data.helpfulCount, notHelpfulCount: data.notHelpfulCount };
+          })
+        };
+      }));
+      toast.success(helpful ? 'Glad this helped!' : 'Thanks for the feedback');
     } catch (err) {
-      console.error('Failed to submit feedback:', err);
+      toast.error(err.message);
     }
   };
 
@@ -113,64 +108,9 @@ export default function HomePage() {
           <h1 className="text-3xl sm:text-4xl font-bold text-[var(--color-text)] mb-3">
             Vicharanashala Q&A Portal
           </h1>
-          <p className="text-[var(--color-text-secondary)] mb-8">
+          <p className="text-lg text-[var(--color-text-secondary)]">
             Search our Elasticsearch knowledge base of questions, FAQs, and community answers.
           </p>
-
-          {/* Search */}
-          <form onSubmit={handleSearch} className="max-w-2xl mx-auto">
-            <div className="relative">
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search everything..."
-                className="search-input w-full px-5 py-3.5 pr-24 text-sm border border-[var(--color-border)] rounded-xl bg-[var(--color-bg-secondary)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)] transition-all"
-              />
-              <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                <span className="text-xs text-[var(--color-text-muted)] hidden sm:inline">
-                  Press Ctrl + K or /
-                </span>
-                <kbd className="hidden sm:inline-flex items-center px-2 py-1 text-xs text-[var(--color-text-muted)] bg-[var(--color-bg-tertiary)] rounded-md border border-[var(--color-border)]">
-                  Ctrl K
-                </kbd>
-              </div>
-            </div>
-          </form>
-
-          {/* Tabs */}
-          <div className="flex items-center justify-center gap-6 mt-6 text-sm">
-            <button
-              onClick={() => setActiveTab('faq')}
-              className={`flex items-center gap-1.5 pb-1 border-b-2 transition-colors ${
-                activeTab === 'faq'
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
-              }`}
-            >
-              💬 Questions
-            </button>
-            <button
-              onClick={() => setActiveTab('faq-answers')}
-              className={`flex items-center gap-1.5 pb-1 border-b-2 transition-colors ${
-                activeTab === 'faq-answers'
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
-              }`}
-            >
-              📖 FAQ Answers
-            </button>
-            <button
-              onClick={() => setActiveTab('tags')}
-              className={`flex items-center gap-1.5 pb-1 border-b-2 transition-colors ${
-                activeTab === 'tags'
-                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]'
-                  : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
-              }`}
-            >
-              🏷️ Tags
-            </button>
-          </div>
         </section>
 
         {/* Categories */}
@@ -276,24 +216,21 @@ export default function HomePage() {
                             >
                               {item.answer}
                             </div>
-                            <div className="flex items-center gap-4 text-xs">
-                              <span className="text-[var(--color-text-muted)]">Was this answer helpful?</span>
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleFeedback(faq._id, item._id, true)}
-                                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-green-500/10 text-[var(--color-text-secondary)] hover:text-green-500 transition-colors"
-                                >
-                                  👍 Yes
-                                </button>
-                                <button
-                                  onClick={() => handleFeedback(faq._id, item._id, false)}
-                                  className="flex items-center gap-1 px-2 py-1 rounded hover:bg-red-500/10 text-[var(--color-text-secondary)] hover:text-red-500 transition-colors"
-                                >
-                                  👎 No
-                                </button>
-                              </div>
-                              <button className="flex items-center gap-1 px-2 py-1 rounded hover:bg-[var(--color-primary)]/10 text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] transition-colors">
-                                🔖 Save
+                            <div className="flex items-center gap-4 text-xs text-[var(--color-text-secondary)]">
+                              <span>Was this helpful?</span>
+                              <button
+                                onClick={() => handleFeedback(faq._id, item._id, true)}
+                                className={`flex items-center gap-1 ${localVotes[item._id] === 'helpful' ? 'text-green-600 font-semibold' : 'hover:text-green-600'}`}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.095c-.5 0-.905.405-.905.905 0 .714-.211 1.412-.608 2.006L7 11v9m7-10h-2M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" /></svg>
+                                Yes ({item.helpfulCount || 0})
+                              </button>
+                              <button
+                                onClick={() => handleFeedback(faq._id, item._id, false)}
+                                className={`flex items-center gap-1 ${localVotes[item._id] === 'notHelpful' ? 'text-red-600 font-semibold' : 'hover:text-red-600'}`}
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.736 3h4.018a2 2 0 01.485.06l3.76.94m-7 10v5a2 2 0 002 2h.096c.5 0 .905-.405.905-.904 0-.715.211-1.413.608-2.008L17 13V4m-7 10h2m5-10h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" /></svg>
+                                No ({item.notHelpfulCount || 0})
                               </button>
                             </div>
                           </div>

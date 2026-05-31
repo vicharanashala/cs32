@@ -27,10 +27,7 @@ export default function RootLayout({ children }) {
           <DotField
             dotRadius={2.5}
             dotSpacing={16}
-            gradientFrom="rgba(168, 85, 247, 0.5)"
-            gradientTo="rgba(180, 151, 207, 0.4)"
             bulgeStrength={67}
-            glowRadius={160}
             sparkle={false}
             waveAmplitude={0}
           />

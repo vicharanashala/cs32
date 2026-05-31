@@ -12,11 +12,8 @@ const DotField = memo(({
   cursorForce = 0.1,
   bulgeOnly = true,
   bulgeStrength = 67,
-  glowRadius = 160,
   sparkle = false,
   waveAmplitude = 0,
-  gradientFrom = 'rgba(168, 85, 247, 0.35)',
-  gradientTo = 'rgba(180, 151, 207, 0.25)',
   className,
   ...rest
 }) => {
@@ -25,16 +22,15 @@ const DotField = memo(({
   const mouseRef = useRef({ x: -9999, y: -9999, prevX: -9999, prevY: -9999, speed: 0 });
   const rafRef = useRef(null);
   const sizeRef = useRef({ w: 0, h: 0, offsetX: 0, offsetY: 0 });
-  const glowOpacity = useRef(0);
   const engagement = useRef(0);
   const propsRef = useRef({});
-  propsRef.current = { dotRadius, dotSpacing, cursorRadius, cursorForce, bulgeOnly, bulgeStrength, sparkle, waveAmplitude, glowRadius };
+  propsRef.current = { dotRadius, dotSpacing, cursorRadius, cursorForce, bulgeOnly, bulgeStrength, sparkle, waveAmplitude };
   const rebuildRef = useRef(null);
   const isDarkRef = useRef(false);
 
-  const getGlowColor = () => isDarkRef.current ? '#120F17' : 'rgba(240, 240, 250, 0.9)';
-  const getGradientFrom = () => isDarkRef.current ? 'rgba(168, 85, 247, 0.35)' : 'rgba(99, 102, 241, 0.25)';
-  const getGradientTo = () => isDarkRef.current ? 'rgba(180, 151, 207, 0.25)' : 'rgba(147, 133, 200, 0.2)';
+  const getGradientFrom = () => isDarkRef.current ? 'rgba(199, 175, 255, 0.5)' : 'rgba(99, 102, 241, 0.4)';
+  const getGradientTo = () => isDarkRef.current ? 'rgba(180, 151, 207, 0.35)' : 'rgba(79, 82, 141, 0.35)';
+  const getDotScale = () => isDarkRef.current ? 1.3 : 0.85;
 
   useEffect(() => {
     isDarkRef.current = document.documentElement.classList.contains('dark');
@@ -133,19 +129,7 @@ const DotField = memo(({
       if (engagement.current < 0.001) engagement.current = 0;
       const eng = engagement.current;
 
-      glowOpacity.current += (eng - glowOpacity.current) * 0.08;
-
       ctx.clearRect(0, 0, w, h);
-
-      if (glowOpacity.current > 0.01 && m.x > 0 && m.y > 0) {
-        const glowGrad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, p.glowRadius);
-        glowGrad.addColorStop(0, getGlowColor());
-        glowGrad.addColorStop(1, 'transparent');
-        ctx.fillStyle = glowGrad;
-        ctx.globalAlpha = glowOpacity.current;
-        ctx.fillRect(0, 0, w, h);
-        ctx.globalAlpha = 1;
-      }
 
       const grad = ctx.createLinearGradient(0, 0, w, h);
       grad.addColorStop(0, getGradientFrom());
@@ -154,7 +138,7 @@ const DotField = memo(({
 
       const cr = p.cursorRadius;
       const crSq = cr * cr;
-      const rad = p.dotRadius / 2;
+      const rad = (p.dotRadius / 2) * getDotScale();
       const isBulge = p.bulgeOnly;
 
       ctx.beginPath();
