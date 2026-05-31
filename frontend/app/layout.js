@@ -6,6 +6,7 @@ import { ThemeProvider } from '@/context/ThemeContext';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import OnboardingModal from '@/components/OnboardingModal';
+import ReactiveBackground from '@/components/ReactiveBackground';
 import { Toaster } from 'react-hot-toast';
 
 export const metadata = {
@@ -22,6 +23,7 @@ export default function RootLayout({ children }) {
         <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-screen flex flex-col font-mono">
+        <ReactiveBackground />
         <AuthProvider>
           <SocketProvider>
             <KeyboardProvider>

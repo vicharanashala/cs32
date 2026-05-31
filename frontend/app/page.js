@@ -22,15 +22,15 @@ export default function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="bg-gradient-to-br from-primary-600 to-primary-800 text-white">
+      <section className="bg-[var(--color-bg-secondary)] text-[var(--color-text)] border-b border-[var(--color-border)]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
           <div className="max-w-3xl">
             <h1 className="text-4xl sm:text-5xl font-bold mb-4">Vicharanashala Internship — FAQ</h1>
-            <p className="text-lg sm:text-xl text-primary-100 mb-8">
+            <p className="text-lg sm:text-xl text-[var(--color-text-secondary)] mb-8">
               Everything you need to know about the Vicharanashala Internship programme.
             </p>
             <div className="flex flex-wrap gap-3">
-              <Link href="/faqs" className="btn bg-white text-primary-700 hover:bg-primary-50 font-semibold px-6 py-3 rounded-lg">
+              <Link href="/faqs" className="btn-primary font-semibold px-6 py-3 rounded-lg">
                 Browse FAQs
               </Link>
               <Link href="/search" className="btn bg-transparent border-2 border-white/30 text-white hover:bg-white/10 font-semibold px-6 py-3 rounded-lg">
