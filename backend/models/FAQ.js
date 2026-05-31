@@ -19,6 +19,11 @@ const faqItemSchema = new mongoose.Schema({
   tags: [{ type: String }],
   lastReviewed: { type: Date },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  userFeedback: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    helpful: { type: Boolean },
+    votedAt: { type: Date, default: Date.now }
+  }],
 }, { timestamps: true });
 
 const faqPageSchema = new mongoose.Schema({

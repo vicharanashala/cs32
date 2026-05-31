@@ -83,6 +83,14 @@ exports.getFAQBySlug = async (req, res, next) => {
     if (!faq) throw new AppError('FAQ not found', 404);
     await FAQ.findByIdAndUpdate(faq._id, { $inc: { viewCount: 1 } });
 
+    const userId = req.user?._id;
+    if (userId) {
+      faq.items.forEach(item => {
+        const userVote = item.userFeedback.find(f => f.user.toString() === userId.toString());
+        item.userVote = userVote ? (userVote.helpful ? 'helpful' : 'notHelpful') : null;
+      });
+    }
+
     res.json({ faq });
   } catch (err) {
     next(err);
@@ -190,11 +198,30 @@ exports.markFAQHelpful = async (req, res, next) => {
     const item = faq.items.id(req.params.itemId);
     if (!item) throw new AppError('FAQ item not found', 404);
 
-    if (helpful) item.helpfulCount += 1;
-    else item.notHelpfulCount += 1;
+    const userId = req.user._id;
+    const existingFeedback = item.userFeedback.find(f => f.user.toString() === userId.toString());
+
+    if (existingFeedback) {
+      if (existingFeedback.helpful === helpful) {
+        return res.status(400).json({ message: 'You have already voted on this item' });
+      }
+      if (existingFeedback.helpful) {
+        item.helpfulCount -= 1;
+        item.notHelpfulCount += 1;
+      } else {
+        item.notHelpfulCount -= 1;
+        item.helpfulCount += 1;
+      }
+      existingFeedback.helpful = helpful;
+      existingFeedback.votedAt = new Date();
+    } else {
+      if (helpful) item.helpfulCount += 1;
+      else item.notHelpfulCount += 1;
+      item.userFeedback.push({ user: userId, helpful });
+    }
 
     await faq.save();
-    res.json({ message: 'Feedback recorded' });
+    res.json({ message: 'Feedback recorded', helpfulCount: item.helpfulCount, notHelpfulCount: item.notHelpfulCount });
   } catch (err) {
     next(err);
   }
