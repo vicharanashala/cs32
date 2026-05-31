@@ -46,6 +46,9 @@ export default function Navbar({ onSearch }) {
               <Link href="/faqs" className="px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-tertiary)] rounded-md transition-colors">
                 FAQs
               </Link>
+              <a href="https://samagama.in" target="_blank" rel="noopener noreferrer" className="px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-tertiary)] rounded-md transition-colors">
+                samagama.in
+              </a>
               <Link href="/tags" className="px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-tertiary)] rounded-md transition-colors">
                 Tags
               </Link>

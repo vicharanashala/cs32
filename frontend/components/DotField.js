@@ -17,13 +17,10 @@ const DotField = memo(({
   waveAmplitude = 0,
   gradientFrom = 'rgba(168, 85, 247, 0.35)',
   gradientTo = 'rgba(180, 151, 207, 0.25)',
-  glowColor = '#120F17',
   className,
   ...rest
 }) => {
   const canvasRef = useRef(null);
-  const svgRef = useRef(null);
-  const glowRef = useRef(null);
   const dotsRef = useRef([]);
   const mouseRef = useRef({ x: -9999, y: -9999, prevX: -9999, prevY: -9999, speed: 0 });
   const rafRef = useRef(null);
@@ -31,13 +28,25 @@ const DotField = memo(({
   const glowOpacity = useRef(0);
   const engagement = useRef(0);
   const propsRef = useRef({});
-  propsRef.current = { dotRadius, dotSpacing, cursorRadius, cursorForce, bulgeOnly, bulgeStrength, sparkle, waveAmplitude, gradientFrom, gradientTo };
+  propsRef.current = { dotRadius, dotSpacing, cursorRadius, cursorForce, bulgeOnly, bulgeStrength, sparkle, waveAmplitude, glowRadius };
   const rebuildRef = useRef(null);
-  const glowIdRef = useRef(`dot-field-glow-${Math.random().toString(36).slice(2, 9)}`);
+  const isDarkRef = useRef(false);
+
+  const getGlowColor = () => isDarkRef.current ? '#120F17' : 'rgba(240, 240, 250, 0.9)';
+  const getGradientFrom = () => isDarkRef.current ? 'rgba(168, 85, 247, 0.35)' : 'rgba(99, 102, 241, 0.25)';
+  const getGradientTo = () => isDarkRef.current ? 'rgba(180, 151, 207, 0.25)' : 'rgba(147, 133, 200, 0.2)';
+
+  useEffect(() => {
+    isDarkRef.current = document.documentElement.classList.contains('dark');
+    const observer = new MutationObserver(() => {
+      isDarkRef.current = document.documentElement.classList.contains('dark');
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const canvas = canvasRef.current;
-    const glowEl = glowRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d', { alpha: true });
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -126,17 +135,21 @@ const DotField = memo(({
 
       glowOpacity.current += (eng - glowOpacity.current) * 0.08;
 
-      if (glowEl) {
-        glowEl.setAttribute('cx', m.x);
-        glowEl.setAttribute('cy', m.y);
-        glowEl.style.opacity = glowOpacity.current;
-      }
-
       ctx.clearRect(0, 0, w, h);
 
+      if (glowOpacity.current > 0.01 && m.x > 0 && m.y > 0) {
+        const glowGrad = ctx.createRadialGradient(m.x, m.y, 0, m.x, m.y, p.glowRadius);
+        glowGrad.addColorStop(0, getGlowColor());
+        glowGrad.addColorStop(1, 'transparent');
+        ctx.fillStyle = glowGrad;
+        ctx.globalAlpha = glowOpacity.current;
+        ctx.fillRect(0, 0, w, h);
+        ctx.globalAlpha = 1;
+      }
+
       const grad = ctx.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, p.gradientFrom);
-      grad.addColorStop(1, p.gradientTo);
+      grad.addColorStop(0, getGradientFrom());
+      grad.addColorStop(1, getGradientTo());
       ctx.fillStyle = grad;
 
       const cr = p.cursorRadius;
@@ -242,31 +255,6 @@ const DotField = memo(({
           height: '100%',
         }}
       />
-      <svg
-        ref={svgRef}
-        style={{
-          position: 'absolute',
-          inset: 0,
-          width: '100%',
-          height: '100%',
-          pointerEvents: 'none',
-        }}
-      >
-        <defs>
-          <radialGradient id={glowIdRef.current}>
-            <stop offset="0%" stopColor={glowColor} />
-            <stop offset="100%" stopColor="transparent" />
-          </radialGradient>
-        </defs>
-        <circle
-          ref={glowRef}
-          cx="-9999"
-          cy="-9999"
-          r={glowRadius}
-          fill={`url(#${glowIdRef.current})`}
-          style={{ opacity: 0, willChange: 'opacity' }}
-        />
-      </svg>
     </div>
   );
 });
