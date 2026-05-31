@@ -31,6 +31,10 @@ export default function HomePage() {
   const [expandedFaq, setExpandedFaq] = useState(null);
   const [loading, setLoading] = useState(true);
   const [localVotes, setLocalVotes] = useState({});
+  const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [newCategoryIcon, setNewCategoryIcon] = useState('📌');
+  const [addingCategory, setAddingCategory] = useState(false);
 
   useEffect(() => {
     loadFAQs();
@@ -96,6 +100,26 @@ export default function HomePage() {
     }
   };
 
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    if (!newCategoryName.trim()) return;
+    setAddingCategory(true);
+    try {
+      await api.post('/categories', { name: newCategoryName.trim(), icon: newCategoryIcon });
+      toast.success('Category added');
+      setShowCategoryModal(false);
+      setNewCategoryName('');
+      setNewCategoryIcon('📌');
+      loadFAQs();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setAddingCategory(false);
+    }
+  };
+
+  const isAdminOrMod = user && (user.role === 'admin' || user.role === 'moderator');
+
   const getIcon = (category) => {
     return CATEGORY_ICONS[category] || '📌';
   };
@@ -117,7 +141,17 @@ export default function HomePage() {
         <section className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-semibold text-[var(--color-text)]">Categories</h2>
-            <span className="text-sm text-[var(--color-text-secondary)]">{categories[0]?.count || 0}</span>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-[var(--color-text-secondary)]">{categories[0]?.count || 0}</span>
+              {isAdminOrMod && (
+                <button
+                  onClick={() => setShowCategoryModal(true)}
+                  className="text-xs text-[var(--color-primary)] hover:text-[var(--color-primary)]/80 font-medium"
+                >
+                  + Add Category
+                </button>
+              )}
+            </div>
           </div>
           <div className="flex flex-wrap gap-2">
             {categories.map((cat) => (
@@ -249,6 +283,55 @@ export default function HomePage() {
           )}
         </section>
       </div>
+
+      {/* Add Category Modal */}
+      {showCategoryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setShowCategoryModal(false)} />
+          <div className="relative bg-[var(--color-bg-secondary)] rounded-xl shadow-xl w-full max-w-md p-6">
+            <h3 className="text-lg font-semibold text-[var(--color-text)] mb-4">Add New Category</h3>
+            <form onSubmit={handleAddCategory}>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Category Name</label>
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="e.g., About the internship"
+                  className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)]"
+                  required
+                />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1">Icon (emoji)</label>
+                <input
+                  type="text"
+                  value={newCategoryIcon}
+                  onChange={(e) => setNewCategoryIcon(e.target.value)}
+                  placeholder="📌"
+                  className="w-full px-3 py-2 text-sm border border-[var(--color-border)] rounded-lg bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)]"
+                />
+              </div>
+              <div className="flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowCategoryModal(false)}
+                  className="px-4 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addingCategory || !newCategoryName.trim()}
+                  className="px-4 py-2 text-sm bg-[var(--color-primary)] text-white rounded-lg hover:opacity-90 disabled:opacity-50"
+                >
+                  {addingCategory ? 'Adding...' : 'Add Category'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
