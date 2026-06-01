@@ -266,6 +266,10 @@ exports.toggleSolvedMyDoubt = async (req, res, next) => {
     const answer = await Answer.findById(req.params.id);
     if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
 
+    if (answer.author.toString() === req.user._id.toString()) {
+      throw new AppError('You cannot mark your own answer as solving your doubt', 400);
+    }
+
     const userId = req.user._id;
     const alreadySolved = answer.solvedByUsers.some(u => u.toString() === userId.toString());
 
