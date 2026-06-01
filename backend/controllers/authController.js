@@ -158,6 +158,7 @@ exports.googleLogin = async (req, res, next) => {
       user.lastActive = new Date();
       if (picture && user.avatarUrl !== picture) {
         user.avatarUrl = picture;
+        user.avatar = picture;
       }
       await user.save();
       const jwtToken = generateToken(user);
@@ -174,6 +175,7 @@ exports.googleLogin = async (req, res, next) => {
       user.authProvider = 'both';
       if (picture && !user.avatarUrl) {
         user.avatarUrl = picture;
+        user.avatar = picture;
       }
       user.lastActive = new Date();
       await user.save();
@@ -189,6 +191,7 @@ exports.googleLogin = async (req, res, next) => {
       email,
       displayName: name || username,
       googleId: sub,
+      avatar: picture || '',
       avatarUrl: picture || '',
       authProvider: 'google',
       hasCompletedOnboarding: false,

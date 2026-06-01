@@ -149,8 +149,9 @@ async function findExistingQuestion(title, tagNames) {
         similarMatch.title.toLowerCase().includes(w)
       );
       const hasMatchingTags = similarMatch.tagNames.some(t => tagNames.includes(t));
-      const scopeMatch = hasSimilarTitle && hasMatchingTags ? 'similar' : 'tag';
-      return { question: similarMatch, scopeMatch };
+      if (hasSimilarTitle && hasMatchingTags) {
+        return { question: similarMatch, scopeMatch: 'similar' };
+      }
     }
   }
 

@@ -68,8 +68,8 @@ exports.getUserQuestions = async (req, res, next) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('tags', 'name color')
-        .select('title upvotes answerCount viewCount createdAt tagNames'),
+        .populate('author', 'username displayName avatar reputation')
+        .populate('tags', 'name color'),
       Question.countDocuments({ author: user._id, isDeleted: false }),
     ]);
 
