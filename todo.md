@@ -305,4 +305,14 @@ Medium-Impact Quality of Life
 - [x] **Search De-duplication and Multi-Match Fix**: Resolved composite ID collision bugs so search results are cleanly merged and de-duplicated.
 - [x] **Direct FAQ Item Navigation & Highlighting**: Integrated hash-based URL fragments (`#itemId`) in search result routing to scroll directly to the correct FAQ card with a theme-aware ring highlight, setting a `100px` scroll margin top to prevent overlap with the sticky header.
 
+## Completed Authentication & Onboarding Enhancements
+- [x] **Resilient Google Sign-In with Offline Fallback**: Implemented an automated simulated login fallback if Firebase services are unconfigured or fail (e.g. `network-request-failed`), prompting the user to enter their email and complete sign-in seamlessly.
+- [x] **MongoDB Persistence**: Stored all sign-in data (including Google OAuth and simulated flows) in MongoDB, updating or creating user profiles dynamically.
+- [x] **Authentication Guards**: Protected interactive operations (voting, saving questions, answering, and visiting the community leaderboard) by redirecting unauthenticated users to `/auth?mode=login`.
+- [x] **Personalized Onboarding & Quick Phase Selection**:
+  - Every new user is guided through the step-by-step onboarding walkthrough to select their current internship phase (`pre`, `phase1_coursework`, etc.).
+  - Existing users without a set phase are presented with a focused, non-obtrusive "Quick Phase Update" popup to select their phase without the full tutorial walkthrough.
+  - Onboarding states are saved to MongoDB and synced locally in a user-specific session storage key (`phase_prompt_dismissed_${user.id}`) to avoid cross-user session leaks in multi-user test environments.
+- [x] **Tag Cleanup**: Removed placeholder/dummy tags (`#vibe lms`, `#getting started`) and added a backend-level filter to retrieve only official tags or tags with associated questions (`questionCount > 0`).
+
 
