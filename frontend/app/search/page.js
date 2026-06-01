@@ -27,14 +27,20 @@ function SearchPageContent() {
   }, [searchParams]);
 
   const performSearch = async (q, t) => {
-    if (!q) return;
+    if (!q || !q.trim()) {
+      setResults([]);
+      setTotal(0);
+      return;
+    }
     setLoading(true);
     try {
-      const data = await api.get('/search', { q, type: t });
+      const data = await api.get('/search', { q: q.trim(), type: t });
       setResults(data.results || []);
       setTotal(data.total || 0);
     } catch (err) {
       console.error(err);
+      setResults([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
@@ -49,18 +55,27 @@ function SearchPageContent() {
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <h1 className="text-2xl font-bold text-[var(--color-text)] mb-6">Search</h1>
+      <div className="mb-8 text-center">
+        <h1 className="text-3xl font-extrabold tracking-tight">
+          <span className="bg-clip-text text-transparent bg-gradient-to-r from-[var(--color-primary)] to-purple-400">Search</span>
+        </h1>
+        <p className="text-sm text-[var(--color-text-secondary)] mt-2">Find questions, FAQs, and community members</p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="flex gap-2 mb-6">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search questions, FAQs, users..."
-          className="input flex-1"
-          autoFocus
-        />
-        <button type="submit" className="btn-primary">Search</button>
+      <form onSubmit={handleSubmit} className="mb-6">
+        <div className="relative">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search questions, FAQs, users..."
+            className="w-full px-4 py-3 pl-12 border border-[var(--color-border)]/60 rounded-xl text-sm bg-[var(--color-bg-secondary)]/80 backdrop-blur-md text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)] transition-all"
+            autoFocus
+          />
+          <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </div>
       </form>
 
       {/* Type filter */}
@@ -99,7 +114,7 @@ function SearchPageContent() {
       {loading ? (
         <div className="space-y-4">
           {[1,2,3].map(i => (
-            <div key={i} className="card p-6 animate-pulse">
+            <div key={i} className="bg-[var(--color-bg-secondary)]/60 border border-[var(--color-border)]/40 rounded-2xl p-6 animate-pulse">
               <div className="h-5 bg-[var(--color-border)] rounded w-3/4 mb-3" />
               <div className="h-4 bg-[var(--color-border)] rounded w-full mb-2" />
               <div className="h-4 bg-[var(--color-border)] rounded w-1/2" />
@@ -107,9 +122,23 @@ function SearchPageContent() {
           ))}
         </div>
       ) : results.length === 0 && searchParams.get('q') ? (
-        <div className="card p-12 text-center">
-          <h3 className="text-lg font-medium text-[var(--color-text)] mb-2">No results found</h3>
-          <p className="text-[var(--color-text-secondary)]">Try different keywords or browse categories</p>
+        <div className="bg-[var(--color-bg-secondary)]/80 backdrop-blur-md border border-[var(--color-border)]/60 rounded-2xl p-12 text-center">
+          <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-bg-tertiary)] flex items-center justify-center">
+            <svg className="w-8 h-8 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">No results found for "{searchParams.get('q')}"</h3>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-6">Try different keywords or browse categories</p>
+          <Link
+            href={`/questions/ask?title=${encodeURIComponent(searchParams.get('q') || '')}`}
+            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-[var(--color-primary)] text-white rounded-xl hover:opacity-90 transition-opacity"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Create new question
+          </Link>
         </div>
       ) : (
         <>
@@ -122,7 +151,7 @@ function SearchPageContent() {
               const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.faqId || result.slug || result.id}` : `/users/${result.username}`;
 
               return (
-                <Link key={result.id} href={link} className="card-hover p-4 block">
+                <Link key={result.id} href={link} className="bg-[var(--color-bg-secondary)]/80 backdrop-blur-md border border-[var(--color-border)]/60 rounded-2xl p-5 block transition-all duration-300 hover:shadow-lg hover:border-[var(--color-primary)]/30 hover:-translate-y-0.5">
                   <div className="flex items-center gap-2 mb-1">
                     <span className="badge-gray text-xs capitalize">{typeLabel}</span>
                     {result.score && <span className="text-xs text-[var(--color-text-secondary)]">Relevance: {Math.round(result.score * 100)}%</span>}
