@@ -19,6 +19,11 @@ const faqItemSchema = new mongoose.Schema({
   tags: [{ type: String }],
   lastReviewed: { type: Date },
   reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+  userFeedback: [{
+    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    helpful: { type: Boolean },
+    votedAt: { type: Date, default: Date.now }
+  }],
 }, { timestamps: true });
 
 const faqPageSchema = new mongoose.Schema({
@@ -45,6 +50,7 @@ const faqPageSchema = new mongoose.Schema({
   isOfficial: { type: Boolean, default: false },
   isPublished: { type: Boolean, default: true },
   viewCount: { type: Number, default: 0 },
+  saveCount: { type: Number, default: 0 },
 
   // Tags for discoverability
   tags: [{ type: String }],

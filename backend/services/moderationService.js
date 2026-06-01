@@ -31,6 +31,21 @@ const flagContent = async ({ targetType, targetId, reason, flaggedBy }) => {
   await Notification.insertMany(notifications);
 };
 
+const clearFlag = async ({ targetType, targetId }) => {
+  let target;
+  if (targetType === 'Question') {
+    target = await Question.findById(targetId);
+  } else if (targetType === 'Answer') {
+    target = await Answer.findById(targetId);
+  }
+  if (!target) throw new Error('Target not found');
+
+  target.isFlagged = false;
+  target.flagReason = null;
+  target.flaggedBy = null;
+  await target.save();
+};
+
 const closeQuestion = async ({ questionId, reason, closedBy }) => {
   const question = await Question.findById(questionId);
   if (!question) throw new Error('Question not found');
@@ -57,4 +72,4 @@ const unbanUser = async (userId) => {
   await User.findByIdAndUpdate(userId, { isBanned: false, banReason: null });
 };
 
-module.exports = { flagContent, closeQuestion, deleteContent, banUser, unbanUser };
+module.exports = { flagContent, clearFlag, closeQuestion, deleteContent, banUser, unbanUser };

@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const { validationResult } = require('express-validator');
 const Answer = require('../models/Answer');
 const Question = require('../models/Question');
@@ -6,6 +7,8 @@ const Notification = require('../models/Notification');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPaginationMeta } = require('../utils/helpers');
 const { emitToUser, emitToQuestion } = require('../socket');
+const { indexQuestion } = require('../services/searchService');
+const { flagContent, clearFlag } = require('../services/moderationService');
 
 exports.createAnswer = async (req, res, next) => {
   try {
@@ -20,6 +23,7 @@ exports.createAnswer = async (req, res, next) => {
       body: req.body.body,
       question: question._id,
       author: req.user._id,
+      confidenceLevel: req.body.confidenceLevel || null,
     });
 
     question.answerCount += 1;
@@ -56,7 +60,8 @@ exports.createAnswer = async (req, res, next) => {
 exports.getAnswers = async (req, res, next) => {
   try {
     const { page, limit, skip } = paginate(req.query.page, req.query.limit);
-    const filter = { question: req.params.questionId, isDeleted: false };
+    const questionId = new mongoose.Types.ObjectId(req.params.questionId);
+    const filter = { question: questionId, isDeleted: false };
 
     const sort = {};
     switch (req.query.sort) {
@@ -80,7 +85,7 @@ exports.getAnswers = async (req, res, next) => {
           as: 'author',
         },
       },
-      { $unwind: '$author' },
+      { $unwind: { path: '$author', preserveNullAndEmptyArrays: true } },
       {
         $project: {
           body: 1,
@@ -88,6 +93,8 @@ exports.getAnswers = async (req, res, next) => {
           downvotes: 1,
           isAccepted: 1,
           isOfficial: 1,
+          solvedMyDoubtCount: 1,
+          confidenceLevel: 1,
           createdAt: 1,
           updatedAt: 1,
           'author.username': 1,
@@ -132,7 +139,8 @@ exports.deleteAnswer = async (req, res, next) => {
   try {
     const answer = await Answer.findById(req.params.id);
     if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
-    if (answer.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    const isModOrAdmin = req.user.role === 'admin' || req.user.role === 'moderator';
+    if (answer.author.toString() !== req.user._id.toString() && !isModOrAdmin) {
       throw new AppError('Not authorized', 403);
     }
 
@@ -153,7 +161,8 @@ exports.acceptAnswer = async (req, res, next) => {
 
     const question = await Question.findById(answer.question);
     if (!question) throw new AppError('Question not found', 404);
-    if (question.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    if (question.author.toString() !== req.user._id.toString() &&
+        req.user.role !== 'admin' && req.user.role !== 'moderator') {
       throw new AppError('Not authorized', 403);
     }
 
@@ -166,7 +175,14 @@ exports.acceptAnswer = async (req, res, next) => {
     await answer.save();
 
     question.acceptedAnswer = answer._id;
+    question.isFAQ = true;
+    question.resolvedAt = new Date();
     await question.save();
+
+    const populatedQuestion = await Question.findById(question._id)
+      .populate('author', 'username displayName avatar reputation')
+      .populate('tags', 'name color');
+    await indexQuestion(populatedQuestion);
 
     // Reward answer author
     await User.findByIdAndUpdate(answer.author, { $inc: { reputation: 15 } });
@@ -182,7 +198,126 @@ exports.acceptAnswer = async (req, res, next) => {
     });
     emitToUser(answer.author.toString(), 'notification:new', { accepted: true });
 
+    if (question.meTooUsers && question.meTooUsers.length > 0) {
+      const meTooNotifications = question.meTooUsers.map(userId => ({
+        recipient: userId,
+        type: 'question_answered',
+        title: 'A question you follow has an answer',
+        message: `"${question.title}" now has an accepted answer`,
+        link: `/questions/${question._id}`,
+        referenceType: 'Question',
+        reference: question._id,
+      }));
+      await Notification.insertMany(meTooNotifications);
+      question.meTooUsers.forEach(userId => {
+        emitToUser(userId.toString(), 'notification:new', { questionAnswered: true });
+      });
+    }
+
     res.json({ answer, message: 'Answer accepted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.unacceptAnswer = async (req, res, next) => {
+  try {
+    const answer = await Answer.findById(req.params.id);
+    if (!answer) throw new AppError('Answer not found', 404);
+
+    const question = await Question.findById(answer.question);
+    if (!question) throw new AppError('Question not found', 404);
+    if (question.author.toString() !== req.user._id.toString() &&
+        req.user.role !== 'admin' && req.user.role !== 'moderator') {
+      throw new AppError('Not authorized', 403);
+    }
+
+    if (question.acceptedAnswer?.toString() !== answer._id.toString()) {
+      throw new AppError('This answer is not the accepted answer', 400);
+    }
+
+    answer.isAccepted = false;
+    await answer.save();
+
+    question.acceptedAnswer = null;
+    question.isFAQ = false;
+    question.resolvedAt = null;
+    await question.save();
+
+    const populatedQuestion = await Question.findById(question._id)
+      .populate('author', 'username displayName avatar reputation')
+      .populate('tags', 'name color');
+    await indexQuestion(populatedQuestion);
+
+    // Remove reputation reward
+    await User.findByIdAndUpdate(answer.author, { $inc: { reputation: -15 } });
+
+    res.json({ answer, message: 'Answer unaccepted' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.toggleSolvedMyDoubt = async (req, res, next) => {
+  try {
+    const answer = await Answer.findById(req.params.id);
+    if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
+
+    const userId = req.user._id;
+    const alreadySolved = answer.solvedByUsers.some(u => u.toString() === userId.toString());
+
+    if (alreadySolved) {
+      answer.solvedByUsers = answer.solvedByUsers.filter(u => u.toString() !== userId.toString());
+      answer.solvedMyDoubtCount = Math.max(0, answer.solvedMyDoubtCount - 1);
+    } else {
+      answer.solvedByUsers.push(userId);
+      answer.solvedMyDoubtCount += 1;
+    }
+
+    await answer.save();
+
+    emitToQuestion(answer.question.toString(), 'answer:solvedUpdated', {
+      answerId: answer._id,
+      solvedMyDoubtCount: answer.solvedMyDoubtCount,
+    });
+
+    res.json({
+      solvedMyDoubtCount: answer.solvedMyDoubtCount,
+      hasSolvedMyDoubt: !alreadySolved,
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+const VALID_FLAG_REASONS = ['incorrect', 'incomplete', 'unclear', 'harmful', 'spam', 'other'];
+
+exports.flagAnswer = async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !VALID_FLAG_REASONS.includes(reason)) {
+      return res.status(400).json({ error: 'Invalid flag reason', validReasons: VALID_FLAG_REASONS });
+    }
+
+    const answer = await Answer.findById(req.params.id);
+    if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
+
+    await flagContent({ targetType: 'Answer', targetId: req.params.id, reason, flaggedBy: req.user._id });
+
+    res.json({ message: 'Answer flagged', reason });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.clearFlagAnswer = async (req, res, next) => {
+  try {
+    const answer = await Answer.findById(req.params.id);
+    if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
+
+    await clearFlag({ targetType: 'Answer', targetId: req.params.id });
+
+    res.json({ message: 'Answer flag cleared' });
   } catch (err) {
     next(err);
   }
