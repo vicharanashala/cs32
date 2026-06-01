@@ -5,7 +5,6 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { fetchDeepAnalytics } from '@/services/adminService';
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -34,8 +33,14 @@ export default function AdminPage() {
   };
   const fetchDeepData = async () => {
     try {
-      const data = await fetchDeepAnalytics();
-      if (data) setDeepStats(data);
+      const [userRes, faqRes] = await Promise.all([
+        api.get('/admin/user-analytics'),
+        api.get('/admin/faq-analytics')
+      ]);
+      setDeepStats({
+        userStats: userRes.data || [],
+        faqStats: faqRes.data || []
+      });
     } catch (error) { console.error("Error fetching deep stats:", error); }
   };
   const fetchUsers = async () => {
