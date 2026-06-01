@@ -15,15 +15,7 @@ export default function CommunityPage() {
   const router = useRouter();
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/auth?mode=login');
-      return;
-    }
-  }, [user, authLoading, router]);
-
-  useEffect(() => {
-    if (!user) return;
-    // Fetch initial leaderboard data
+    // Fetch initial leaderboard data (public, no auth required)
     api.get('/users/leaderboard')
       .then(data => {
         setLeaderboard(data.leaderboard || []);

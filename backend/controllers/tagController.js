@@ -8,11 +8,8 @@ exports.getTags = async (req, res, next) => {
     if (req.query.search) {
       filter.name = { $regex: req.query.search, $options: 'i' };
     } else {
-      // Ensure we only retrieve official tags or tags associated with at least one question when not filtering
-      filter.$or = [
-        { isOfficial: true },
-        { questionCount: { $gt: 0 } }
-      ];
+      // Only show tags that have actually been used on questions
+      filter.questionCount = { $gt: 0 };
     }
     if (req.query.category) filter.category = req.query.category;
 

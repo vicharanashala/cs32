@@ -160,7 +160,7 @@ async function findExistingQuestion(title, tagNames) {
 exports.getQuestions = async (req, res, next) => {
   try {
     const { page, limit, skip } = paginate(req.query.page, req.query.limit);
-    const filter = { isDeleted: false, status: { $ne: 'deleted' } };
+    const filter = { isDeleted: { $ne: true } };
 
     if (req.query.tag) filter.tagNames = req.query.tag.toLowerCase();
     if (req.query.author) filter.author = req.query.author;
@@ -180,6 +180,7 @@ exports.getQuestions = async (req, res, next) => {
     }
 
     const isModOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'moderator');
+    const currentUserId = req.user ? req.user._id.toString() : null;
 
     const [questions, total] = await Promise.all([
       Question.find(filter)
@@ -192,8 +193,9 @@ exports.getQuestions = async (req, res, next) => {
     ]);
 
     const withOwner = questions.map(q => {
-      const isAuthor = req.user && q.author && q.author._id && q.author._id.toString() === req.user._id.toString();
-      const anonymized = q.isAnonymous && !isModOrAdmin ? {
+      const authorId = q.author && q.author._id ? q.author._id.toString() : null;
+      const isAuthor = currentUserId && authorId && currentUserId === authorId;
+      const anonymized = q.isAnonymous && !isAuthor && !isModOrAdmin ? {
         ...q.toObject(),
         author: {
           _id: 'anonymous',
@@ -205,7 +207,7 @@ exports.getQuestions = async (req, res, next) => {
       } : q.toObject();
       return {
         ...anonymized,
-        hasMeToo: req.user ? q.meTooUsers && q.meTooUsers.some(u => u.toString() === req.user._id.toString()) : false,
+        hasMeToo: currentUserId ? q.meTooUsers && q.meTooUsers.some(u => u.toString() === currentUserId) : false,
         isOwner: isAuthor,
       };
     });

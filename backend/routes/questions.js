@@ -5,7 +5,7 @@ const ctrl = require('../controllers/questionController');
 const { flagContent } = require('../services/moderationService');
 
 router.get('/similar', ctrl.findSimilar);
-router.get('/', ctrl.getQuestions);
+router.get('/', optionalAuth, ctrl.getQuestions);
 router.get('/:id', optionalAuth, ctrl.getQuestion);
 router.get('/:id/similar', ctrl.getSimilarQuestions);
 router.get('/:id/related', ctrl.getRelatedQuestions);
