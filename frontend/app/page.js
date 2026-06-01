@@ -5,6 +5,7 @@ import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
+import RecommendedFAQs from '@/components/RecommendedFAQs';
 
 const CATEGORY_ICONS = {
   'About the internship': '💼',
@@ -236,6 +237,15 @@ export default function HomePage() {
               </div>
             ) : (
               <div className="space-y-4">
+                {selectedCategory === 'All Categories' && (
+                  <div className="mb-8 p-6 bg-[var(--color-bg-secondary)]/30 border border-[var(--color-border)]/40 rounded-2xl">
+                    <div className="flex items-center gap-2 mb-4">
+                      <span className="text-lg">💡</span>
+                      <h3 className="text-base font-bold text-[var(--color-text)] bg-clip-text text-transparent bg-gradient-to-r from-[var(--color-primary)] to-purple-400">Recommended For You</h3>
+                    </div>
+                    <RecommendedFAQs limit={8} layout="grid" />
+                  </div>
+                )}
                 {filteredFAQs.map((faq) => {
                   const isExpanded = expandedFaq === faq._id || expandedFaq === 'all';
                   return (

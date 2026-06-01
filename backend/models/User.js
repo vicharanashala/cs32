@@ -55,6 +55,14 @@ const userSchema = new mongoose.Schema({
 
   // Onboarding
   hasCompletedOnboarding: { type: Boolean, default: false },
+  currentPhase: {
+    type: String,
+    enum: ['pre', 'phase1_coursework', 'phase1_completed', 'phase2_project', 'completed']
+  },
+  tagAffinity: [{
+    tag: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now }
+  }],
 }, { timestamps: true });
 
 userSchema.index({ username: 'text', displayName: 'text', bio: 'text' });
@@ -85,6 +93,7 @@ userSchema.methods.toPublicJSON = function () {
     questionCount: this.questionCount,
     answerCount: this.answerCount,
     hasCompletedOnboarding: this.hasCompletedOnboarding,
+    currentPhase: this.currentPhase,
     createdAt: this.createdAt,
   };
 };

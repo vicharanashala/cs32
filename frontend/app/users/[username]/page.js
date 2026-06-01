@@ -25,6 +25,7 @@ export default function UserProfilePage() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editDisplayName, setEditDisplayName] = useState('');
   const [editBio, setEditBio] = useState('');
+  const [editPhase, setEditPhase] = useState('pre');
   const [editAvatarFile, setEditAvatarFile] = useState(null);
   const [updating, setUpdating] = useState(false);
 
@@ -55,6 +56,7 @@ export default function UserProfilePage() {
       const formData = new FormData();
       formData.append('displayName', editDisplayName.trim());
       formData.append('bio', editBio.trim());
+      formData.append('currentPhase', editPhase);
       if (editAvatarFile) {
         formData.append('avatar', editAvatarFile);
       }
@@ -124,6 +126,11 @@ export default function UserProfilePage() {
                 <span className="flex items-center gap-1">
                   <span className="font-bold text-[var(--color-primary)] text-sm">{user.reputation}</span> reputation
                 </span>
+                {user.currentPhase && (
+                  <span className="inline-flex items-center px-2 py-0.5 rounded bg-[var(--color-primary)]/10 text-[var(--color-primary)] font-semibold uppercase tracking-wider text-[9px]">
+                    🚀 {user.currentPhase.replace('_', ' ')}
+                  </span>
+                )}
                 {user.location && <span>📍 {user.location}</span>}
                 {user.website && (
                   <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-[var(--color-primary)] hover:underline">
@@ -161,6 +168,7 @@ export default function UserProfilePage() {
                 onClick={() => {
                   setEditDisplayName(user.displayName || '');
                   setEditBio(user.bio || '');
+                  setEditPhase(user.currentPhase || 'pre');
                   setShowEditModal(true);
                 }}
                 className="px-4 py-2 text-xs font-semibold rounded-xl border border-[var(--color-border)] hover:border-[var(--color-primary)]/40 hover:text-[var(--color-primary)] transition-all flex items-center gap-1.5 bg-[var(--color-bg-secondary)]/80 sm:mt-auto"
@@ -332,6 +340,20 @@ export default function UserProfilePage() {
                   className="w-full px-3.5 py-2.5 text-sm border border-[var(--color-border)] rounded-xl bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)] h-28 resize-none"
                   maxLength={500}
                 />
+              </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Current Project Phase</label>
+                <select
+                  value={editPhase}
+                  onChange={(e) => setEditPhase(e.target.value)}
+                  className="w-full px-3.5 py-2.5 text-sm border border-[var(--color-border)] rounded-xl bg-[var(--color-bg)] text-[var(--color-text)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)]"
+                >
+                  <option value="pre">Pre-Internship / Getting Started</option>
+                  <option value="phase1_coursework">Phase 1 - Coursework & LMS</option>
+                  <option value="phase1_completed">Phase 1 Completed - Team Formation</option>
+                  <option value="phase2_project">Phase 2 - Project & Interviews</option>
+                  <option value="completed">Completed / Alumni</option>
+                </select>
               </div>
               <div className="mb-6">
                 <label className="block text-sm font-medium text-[var(--color-text)] mb-1.5">Profile Picture</label>

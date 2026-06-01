@@ -6,6 +6,7 @@ const { reindexAllFAQs } = require('../services/searchService');
 const FAQ = require('../models/FAQ');
 
 router.get('/', ctrl.getFAQs);
+router.get('/recommended', optionalAuth, ctrl.getRecommendedFAQs);
 router.get('/:slug', ctrl.getFAQBySlug);
 router.post('/', auth, moderatorOrAdmin, ctrl.createFAQ);
 router.put('/:id', auth, moderatorOrAdmin, ctrl.updateFAQ);

@@ -68,7 +68,7 @@ exports.getMe = async (req, res) => {
 exports.updateProfile = async (req, res, next) => {
   try {
     const updates = {};
-    const allowed = ['displayName', 'bio', 'website', 'location', 'preferences'];
+    const allowed = ['displayName', 'bio', 'website', 'location', 'preferences', 'currentPhase'];
     for (const field of allowed) {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     }
@@ -77,6 +77,18 @@ exports.updateProfile = async (req, res, next) => {
 
     const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
     await indexUser(user);
+
+    // Invalidate recommendation cache if phase changed
+    if (updates.currentPhase !== undefined) {
+      try {
+        const { getRedis } = require('../config/redis');
+        const redis = getRedis();
+        await redis.del(`recommendations:user:${req.user._id.toString()}`);
+      } catch (redisErr) {
+        console.error('Redis delete recommendation cache error:', redisErr.message);
+      }
+    }
+
     res.json({ user: user.toPublicJSON() });
   } catch (err) {
     next(err);

@@ -90,8 +90,23 @@ exports.getMeTooQuestions = async (req, res, next) => {
 
 exports.completeOnboarding = async (req, res, next) => {
   try {
-    await User.findByIdAndUpdate(req.user._id, { hasCompletedOnboarding: true });
-    res.json({ message: 'Onboarding completed' });
+    const { currentPhase } = req.body;
+    const updates = { hasCompletedOnboarding: true };
+    if (currentPhase) {
+      updates.currentPhase = currentPhase;
+    }
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
+
+    // Invalidate recommendation cache
+    try {
+      const { getRedis } = require('../config/redis');
+      const redis = getRedis();
+      await redis.del(`recommendations:user:${req.user._id.toString()}`);
+    } catch (redisErr) {
+      console.error('Redis delete recommendation cache error:', redisErr.message);
+    }
+
+    res.json({ message: 'Onboarding completed', user: user.toPublicJSON() });
   } catch (err) {
     next(err);
   }
@@ -194,6 +209,11 @@ exports.saveFAQ = async (req, res, next) => {
     await SavedFAQ.create({ user: req.user._id, faq: faqId });
     await FAQ.findByIdAndUpdate(faqId, { $inc: { saveCount: 1 } });
     await User.findByIdAndUpdate(req.user._id, { $inc: { savedCount: 1 } });
+
+    if (faq.tags && faq.tags.length > 0) {
+      const { recordTagAffinity } = require('../services/recommendationService');
+      recordTagAffinity(req.user._id, faq.tags);
+    }
 
     res.status(201).json({ message: 'FAQ saved' });
   } catch (err) {
