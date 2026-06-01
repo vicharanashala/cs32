@@ -5,14 +5,12 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { fetchDeepAnalytics } from '@/services/adminService'; 
 
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState('dashboard');
   const [stats, setStats] = useState(null);
-  const [deepStats, setDeepStats] = useState(null); 
   const [users, setUsers] = useState([]);
   const [flaggedQs, setFlaggedQs] = useState([]);
   const [flaggedAs, setFlaggedAs] = useState([]);
@@ -26,7 +24,6 @@ export default function AdminPage() {
     fetchDashboard();
     fetchUsers();
     fetchFlagged();
-    fetchDeepData(); 
   }, [user]);
 
   const fetchDashboard = async () => {
@@ -34,17 +31,6 @@ export default function AdminPage() {
       const data = await api.get('/admin/dashboard');
       setStats(data.stats);
     } catch (_) {}
-  };
-
-  const fetchDeepData = async () => {
-    try {
-      const data = await fetchDeepAnalytics();
-      if (data) {
-        setDeepStats(data);
-      }
-    } catch (error) {
-      console.error("Error fetching deep stats:", error);
-    }
   };
 
   const fetchUsers = async () => {
@@ -129,65 +115,22 @@ export default function AdminPage() {
           <div className="h-4 bg-gray-200 rounded w-1/2" />
         </div>
       ) : tab === 'dashboard' && stats ? (
-        <div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-            {[
-              { label: 'Total Questions', value: stats.totalQuestions },
-              { label: 'Total Answers', value: stats.totalAnswers },
-              { label: 'Total Users', value: stats.totalUsers },
-              { label: 'Total FAQs', value: stats.totalFAQs },
-              { label: 'Total Votes', value: stats.totalVotes },
-              { label: 'Questions Today', value: stats.questionsToday },
-              { label: 'Resolution Rate', value: `${stats.resolutionRate}%` },
-              { label: 'Active FAQs', value: stats.totalFAQs },
-            ].map(item => (
-              <div key={item.label} className="card p-4 text-center">
-                <p className="text-2xl font-bold text-primary-600">{item.value}</p>
-                <p className="text-xs text-gray-500 mt-1">{item.label}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* CORRECTED: PrashnaSārathi User & FAQ Insights Section */}
-          {deepStats && (
-            <div className="mt-8 border-t border-gray-200 pt-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Platform Insights</h2>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* User Registrations Panel */}
-                <div className="card p-6">
-                  <h3 className="font-semibold text-lg mb-4 text-gray-800">New Registrations (30 Days)</h3>
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
-                    {deepStats.userStats?.map((day) => (
-                      <div key={day._id} className="flex justify-between items-center border-b border-gray-100 pb-2">
-                        <span className="text-sm text-gray-600">{day._id}</span>
-                        <span className="text-sm font-medium text-gray-900">{day.newUsers} users</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Top FAQs Panel */}
-                <div className="card p-6">
-                  <h3 className="font-semibold text-lg mb-4 text-gray-800">Top 10 Most Helpful FAQs</h3>
-                  <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
-                    {deepStats.faqStats?.map((faq, index) => (
-                      <div key={index} className="flex flex-col border-b border-gray-100 pb-2">
-                        <span className="font-medium text-sm text-gray-900">{faq.question}</span>
-                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                          <span className="text-green-600">👍 {faq.helpfulCount}</span>
-                          <span className="text-red-600">👎 {faq.notHelpfulCount}</span>
-                          <span className="bg-gray-100 px-2 py-1 rounded">{faq.category}</span>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-              </div>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Total Questions', value: stats.totalQuestions },
+            { label: 'Total Answers', value: stats.totalAnswers },
+            { label: 'Total Users', value: stats.totalUsers },
+            { label: 'Total FAQs', value: stats.totalFAQs },
+            { label: 'Total Votes', value: stats.totalVotes },
+            { label: 'Questions Today', value: stats.questionsToday },
+            { label: 'Resolution Rate', value: `${stats.resolutionRate}%` },
+            { label: 'Active FAQs', value: stats.totalFAQs },
+          ].map(item => (
+            <div key={item.label} className="card p-4 text-center">
+              <p className="text-2xl font-bold text-primary-600">{item.value}</p>
+              <p className="text-xs text-gray-500 mt-1">{item.label}</p>
             </div>
-          )}
+          ))}
         </div>
       ) : tab === 'users' ? (
         <div className="card overflow-hidden">

@@ -5,14 +5,14 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
-import { fetchDeepAnalytics } from '@/services/adminService'; 
+import { fetchDeepAnalytics } from '@/services/adminService'; // Note: Adjust this path if adminService is located elsewhere
 
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [tab, setTab] = useState('dashboard');
   const [stats, setStats] = useState(null);
-  const [deepStats, setDeepStats] = useState(null); 
+  const [deepStats, setDeepStats] = useState(null); // Added state for deep analytics
   const [users, setUsers] = useState([]);
   const [flaggedQs, setFlaggedQs] = useState([]);
   const [flaggedAs, setFlaggedAs] = useState([]);
@@ -26,7 +26,7 @@ export default function AdminPage() {
     fetchDashboard();
     fetchUsers();
     fetchFlagged();
-    fetchDeepData(); 
+    fetchDeepData(); // Added call to fetch deep analytics
   }, [user]);
 
   const fetchDashboard = async () => {
@@ -36,6 +36,7 @@ export default function AdminPage() {
     } catch (_) {}
   };
 
+  // Added function to fetch your custom backend data
   const fetchDeepData = async () => {
     try {
       const data = await fetchDeepAnalytics();
@@ -119,7 +120,7 @@ export default function AdminPage() {
             }`}
           >
             {t}
-          </button>
+.          </button>
         ))}
       </div>
 
@@ -148,43 +149,39 @@ export default function AdminPage() {
             ))}
           </div>
 
-          {/* CORRECTED: PrashnaSārathi User & FAQ Insights Section */}
+          {/* ADDED DEEP ANALYTICS SECTION */}
           {deepStats && (
             <div className="mt-8 border-t border-gray-200 pt-8">
-              <h2 className="text-xl font-bold text-gray-900 mb-6">Platform Insights</h2>
+              <h2 className="text-xl font-bold text-gray-900 mb-6">Deep Analytics (SmartMetro Inspired)</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* User Registrations Panel */}
                 <div className="card p-6">
-                  <h3 className="font-semibold text-lg mb-4 text-gray-800">New Registrations (30 Days)</h3>
+                  <h3 className="font-semibold text-lg mb-4 text-gray-800">Daily Active Users (Last 30 Days)</h3>
                   <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
                     {deepStats.userStats?.map((day) => (
                       <div key={day._id} className="flex justify-between items-center border-b border-gray-100 pb-2">
-                        <span className="text-sm text-gray-600">{day._id}</span>
-                        <span className="text-sm font-medium text-gray-900">{day.newUsers} users</span>
+                        <span className="text-gray-600">{day._id}</span>
+                        <span className="font-bold text-primary-600 bg-primary-50 px-3 py-1 rounded-full">{day.newUsers}</span>
                       </div>
                     ))}
                   </div>
                 </div>
 
-                {/* Top FAQs Panel */}
                 <div className="card p-6">
-                  <h3 className="font-semibold text-lg mb-4 text-gray-800">Top 10 Most Helpful FAQs</h3>
+                  <h3 className="font-semibold text-lg mb-4 text-gray-800">Top 10 High-Frequency FAQs</h3>
                   <div className="space-y-3 max-h-64 overflow-y-auto pr-2">
                     {deepStats.faqStats?.map((faq, index) => (
                       <div key={index} className="flex flex-col border-b border-gray-100 pb-2">
-                        <span className="font-medium text-sm text-gray-900">{faq.question}</span>
+                        <span className="font-medium text-sm text-gray-900 line-clamp-2">{faq.question}</span>
                         <div className="flex items-center gap-4 mt-2 text-xs text-gray-500">
-                          <span className="text-green-600">👍 {faq.helpfulCount}</span>
-                          <span className="text-red-600">👎 {faq.notHelpfulCount}</span>
+                          <span className="flex items-center gap-1"><span className="text-green-500">👍</span> {faq.helpfulCount}</span>
+                          <span className="flex items-center gap-1"><span className="text-red-500">👎</span> {faq.notHelpfulCount}</span>
                           <span className="bg-gray-100 px-2 py-1 rounded">{faq.category}</span>
                         </div>
                       </div>
                     ))}
                   </div>
                 </div>
-
               </div>
             </div>
           )}
