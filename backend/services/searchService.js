@@ -211,13 +211,48 @@ const indexUser = async (user) => {
   }
 };
 
+const STOP_WORDS = new Set([
+  'a', 'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'arent', 'as', 'at', 
+  'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 'cant', 'cannot', 'could', 
+  'couldnt', 'did', 'didnt', 'do', 'does', 'doesnt', 'doing', 'dont', 'down', 'during', 'each', 'few', 'for', 'from', 
+  'further', 'had', 'hadnt', 'has', 'hasnt', 'have', 'havent', 'having', 'he', 'hed', 'hell', 'hes', 'her', 'here', 
+  'heres', 'hers', 'herself', 'him', 'himself', 'his', 'how', 'hows', 'i', 'id', 'ill', 'im', 'ive', 'if', 'in', 
+  'into', 'is', 'isnt', 'it', 'its', 'itself', 'lets', 'me', 'more', 'most', 'mustnt', 'my', 'myself', 'no', 'nor', 
+  'not', 'of', 'off', 'on', 'once', 'only', 'or', 'other', 'ought', 'our', 'ours', 'ourselves', 'out', 'over', 'own', 
+  'same', 'shant', 'she', 'shed', 'shell', 'shes', 'should', 'shouldnt', 'so', 'some', 'such', 'than', 'that', 'thats', 
+  'the', 'their', 'theirs', 'them', 'themselves', 'then', 'there', 'theres', 'these', 'they', 'theyd', 'theyll', 
+  'theyre', 'theyve', 'this', 'those', 'through', 'to', 'too', 'under', 'until', 'up', 'very', 'was', 'wasnt', 'we', 
+  'wed', 'well', 'were', 'weve', 'werent', 'what', 'whats', 'when', 'whens', 'where', 'wheres', 'which', 'while', 
+  'who', 'whos', 'whom', 'why', 'whys', 'with', 'wont', 'would', 'wouldnt', 'you', 'youd', 'youll', 'youre', 'youve', 
+  'your', 'yours', 'yourself', 'yourselves'
+]);
+
+const cleanSearchQuery = (queryStr) => {
+  if (!queryStr) return '';
+  const words = queryStr.toLowerCase().replace(/[^\w\s]/g, ' ').split(/\s+/).filter(Boolean);
+  const filtered = words.filter(w => !STOP_WORDS.has(w));
+  return filtered.join(' ').trim() || queryStr;
+};
+
 const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
+  try {
+    const Question = require('../models/Question');
+    const FAQ = require('../models/FAQ');
+    const User = require('../models/User');
+    const Tag = require('../models/Tag');
+
+  const cleanedQuery = cleanSearchQuery(query);
+  const terms = cleanedQuery.split(/\s+/).filter(Boolean);
+
+  let esResults = [];
+  let esTotal = 0;
+
+  // 1. Run Elasticsearch Search
   try {
     const es = getES();
     const must = [];
     const filter = [];
 
-    // Strict tab routing: each tab targets only its own index/indices
     let indices;
     if (type === 'questions') {
       indices = INDEX_QUESTIONS;
@@ -226,54 +261,48 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
     } else if (type === 'users') {
       indices = INDEX_USERS;
     } else {
-      // "All" tab: search across all indices
       indices = [INDEX_QUESTIONS, INDEX_FAQS, INDEX_FAQ_ITEMS, INDEX_USERS];
     }
 
-    if (query) {
+    if (cleanedQuery) {
       if (type === 'users') {
         must.push({
           multi_match: {
-            query,
+            query: cleanedQuery,
             fields: ['username^3', 'displayName^2', 'bio'],
             type: 'best_fields',
-            fuzziness: 0,
+            fuzziness: 1,
             minimum_should_match: '2<70%',
-            analyzer: 'english',
           },
         });
       } else if (type === 'questions') {
         must.push({
           multi_match: {
-            query,
+            query: cleanedQuery,
             fields: ['title^3', 'body^2', 'tags', 'authorName'],
             type: 'best_fields',
-            fuzziness: 0,
+            fuzziness: 1,
             minimum_should_match: '2<70%',
-            analyzer: 'english',
           },
         });
       } else if (type === 'faqs') {
         must.push({
           multi_match: {
-            query,
+            query: cleanedQuery,
             fields: ['title^3', 'description^2', 'question^4', 'answer', 'tags'],
             type: 'best_fields',
-            fuzziness: 0,
+            fuzziness: 1,
             minimum_should_match: '2<70%',
-            analyzer: 'english',
           },
         });
       } else {
-        // "All" tab: fuzzy search across all field names from every index
         must.push({
           multi_match: {
-            query,
+            query: cleanedQuery,
             fields: ['title^3', 'body^2', 'question^4', 'answer', 'description', 'tags', 'username^2', 'displayName', 'bio', 'authorName'],
             type: 'best_fields',
-            fuzziness: 0,
+            fuzziness: 1,
             minimum_should_match: '2<70%',
-            analyzer: 'english',
           },
         });
       }
@@ -283,9 +312,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
       filter.push({ terms: { tags } });
     }
 
-    // Per-tab visibility filters (only restrict what must be restricted)
     if (type === 'faqs') {
-      // FAQ tab: only show published FAQ items
       filter.push({
         bool: {
           should: [
@@ -296,8 +323,6 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
         },
       });
     } else if (!type || type === '') {
-      // "All" tab: show all questions (regardless of isFAQ), all FAQs, all users,
-      // but only show published FAQ items
       filter.push({
         bool: {
           should: [
@@ -310,12 +335,10 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
         },
       });
     }
-    // "questions" and "users" tabs don't need extra filters —
-    // they already target a single index
 
     const body = {
-      from: (page - 1) * limit,
-      size: limit,
+      from: 0,
+      size: 100,
       sort: type === 'users'
         ? [{ _score: 'desc' }]
         : [{ _score: 'desc' }, { createdAt: { order: 'desc' } }],
@@ -331,7 +354,6 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
 
     const result = await es.search({ index: indices, body });
 
-    // Map ES index names to frontend type labels
     const indexToType = {
       [INDEX_QUESTIONS]: 'question',
       [INDEX_FAQS]: 'faq',
@@ -339,23 +361,192 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
       [INDEX_USERS]: 'user',
     };
 
-    let results = result.hits.hits.map(h => ({
-        id: h._id,
-        ...h._source,
-        _type: indexToType[h._index] || 'unknown',
-        score: h._score,
-      }));
+    esResults = result.hits.hits.map(h => ({
+      id: h._id,
+      ...h._source,
+      _type: indexToType[h._index] || 'unknown',
+      score: h._score,
+    }));
+    esTotal = result.hits.total.value;
+  } catch (err) {
+    console.error('ES Search error, falling back to DB:', err.message);
+  }
 
-    if (type === 'users') {
-      results.sort((a, b) => (a.displayName || a.username || '').localeCompare(b.displayName || b.username || ''));
+  // 2. Run Database Fallback / Hybrid Search
+  const mongoResults = [];
+  try {
+    const promises = [];
+    const filterConditions = {};
+
+    let tagIds = [];
+    if (tags && tags.length > 0) {
+      const matchingTags = await Tag.find({ name: { $in: tags.map(t => t.toLowerCase()) } }).lean();
+      tagIds = matchingTags.map(t => t._id);
     }
 
-    return {
-      results,
-      total: result.hits.total.value,
-      page,
-      limit,
-    };
+    // A. Questions
+    if (!type || type === 'questions') {
+      const qFilter = { isDeleted: false };
+      if (tagIds.length > 0) qFilter.tags = { $in: tagIds };
+      if (terms.length > 0) {
+        qFilter.$and = terms.map(term => ({
+          $or: [
+            { title: { $regex: term, $options: 'i' } },
+            { body: { $regex: term, $options: 'i' } }
+          ]
+        }));
+      }
+      promises.push(
+        Question.find(qFilter)
+          .populate('author', 'username displayName')
+          .limit(50)
+          .lean()
+          .then(qs => qs.map(q => ({
+            id: q._id.toString(),
+            title: q.title,
+            body: q.body,
+            tags: q.tags || [],
+            authorName: q.author ? (q.author.displayName || q.author.username) : 'anonymous',
+            createdAt: q.createdAt,
+            _type: 'question',
+            score: 1.0,
+          })))
+      );
+    }
+
+    // B. FAQs & FAQ Items
+    if (!type || type === 'faqs') {
+      const fFilter = { isPublished: true };
+      if (tags && tags.length > 0) fFilter.tags = { $in: tags.map(t => t.toLowerCase()) };
+      if (terms.length > 0) {
+        fFilter.$and = terms.map(term => ({
+          $or: [
+            { title: { $regex: term, $options: 'i' } },
+            { description: { $regex: term, $options: 'i' } },
+            { 'items.question': { $regex: term, $options: 'i' } },
+            { 'items.answer': { $regex: term, $options: 'i' } }
+          ]
+        }));
+      }
+      promises.push(
+        FAQ.find(fFilter)
+          .limit(50)
+          .lean()
+          .then(faqs => {
+            const items = [];
+            for (const f of faqs) {
+              const pageMatches = terms.length === 0 || terms.every(term => 
+                f.title.toLowerCase().includes(term) || 
+                (f.description && f.description.toLowerCase().includes(term))
+              );
+              if (pageMatches) {
+                items.push({
+                  id: f._id.toString(),
+                  title: f.title,
+                  description: f.description,
+                  category: f.category,
+                  tags: f.tags,
+                  createdAt: f.createdAt,
+                  _type: 'faq',
+                  score: 1.0,
+                });
+              }
+              for (const item of f.items || []) {
+                if (!item.isPublished) continue;
+                const itemMatches = terms.length === 0 || terms.every(term => 
+                  item.question.toLowerCase().includes(term) || 
+                  item.answer.toLowerCase().includes(term)
+                );
+                if (itemMatches) {
+                  items.push({
+                    id: `${f._id.toString()}_${item._id.toString()}`,
+                    faqId: f._id.toString(),
+                    faqTitle: f.title,
+                    question: item.question,
+                    answer: item.answer,
+                    tags: item.tags,
+                    createdAt: item.createdAt,
+                    _type: 'faq',
+                    score: 1.0,
+                  });
+                }
+              }
+            }
+            return items;
+          })
+      );
+    }
+
+    // C. Users
+    if (!type || type === 'users') {
+      const uFilter = {};
+      if (terms.length > 0) {
+        uFilter.$and = terms.map(term => ({
+          $or: [
+            { username: { $regex: term, $options: 'i' } },
+            { displayName: { $regex: term, $options: 'i' } },
+            { bio: { $regex: term, $options: 'i' } }
+          ]
+        }));
+      }
+      promises.push(
+        User.find(uFilter)
+          .limit(50)
+          .lean()
+          .then(us => us.map(u => ({
+            id: u._id.toString(),
+            username: u.username,
+            displayName: u.displayName || u.username,
+            bio: u.bio || '',
+            reputation: u.reputation || 0,
+            createdAt: u.createdAt,
+            _type: 'user',
+            score: 1.0,
+          })))
+      );
+    }
+
+    const dbResults = await Promise.all(promises).then(r => r.flat());
+    mongoResults.push(...dbResults);
+  } catch (err) {
+    console.error('DB fallback query error:', err.message);
+  }
+
+  // 3. Merge, Deduplicate, Sort and Paginate
+  const mergedMap = new Map();
+  // Add DB results first
+  for (const r of mongoResults) {
+    mergedMap.set(r.id, r);
+  }
+  // Add ES results (so they take precedence and overwrite score/data with ES scores)
+  for (const r of esResults) {
+    mergedMap.set(r.id, r);
+  }
+
+  let mergedResults = Array.from(mergedMap.values());
+
+  // Sort
+  if (type === 'users') {
+    mergedResults.sort((a, b) => (a.displayName || a.username || '').localeCompare(b.displayName || b.username || ''));
+  } else {
+    mergedResults.sort((a, b) => {
+      if (b.score !== a.score) {
+        return b.score - a.score;
+      }
+      return new Date(b.createdAt) - new Date(a.createdAt);
+    });
+  }
+
+  const total = mergedResults.length;
+  const startIndex = (page - 1) * limit;
+  const paginatedResults = mergedResults.slice(startIndex, startIndex + limit);
+
+  return {
+    results: paginatedResults,
+    total,
+    page,
+    limit,
+  };
   } catch (err) {
     console.error('Search error:', err.message);
     return { results: [], total: 0, page, limit };
