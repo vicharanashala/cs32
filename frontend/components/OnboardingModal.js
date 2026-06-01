@@ -62,13 +62,17 @@ export default function OnboardingModal() {
   const [step, setStep] = useState(0);
   const [dismissed, setDismissed] = useState(false);
   const [selectedPhase, setSelectedPhase] = useState('pre');
+  const [isQuickPhaseFill, setIsQuickPhaseFill] = useState(false);
 
   useEffect(() => {
-    if (!user || loading) return;
+    if (!user || loading) {
+      setIsOpen(false);
+      return;
+    }
     if (user.role === 'admin' || user.role === 'moderator') return;
 
     // Prevent repeated popups if user dismissed the prompt in current session
-    if (typeof window !== 'undefined' && sessionStorage.getItem('phase_prompt_dismissed')) {
+    if (typeof window !== 'undefined' && sessionStorage.getItem(`phase_prompt_dismissed_${user.id}`)) {
       return;
     }
 
@@ -77,11 +81,15 @@ export default function OnboardingModal() {
 
     if (needsOnboarding) {
       setStep(0);
+      setIsQuickPhaseFill(false);
       setIsOpen(true);
     } else if (needsPhaseSelection) {
-      // Existing user who hasn't selected a phase -> jump directly to phase selection step
+      // Existing user who hasn't selected a phase -> jump directly to phase selection step in quick mode
       setStep(STEPS.length - 1);
+      setIsQuickPhaseFill(true);
       setIsOpen(true);
+    } else {
+      setIsOpen(false);
     }
   }, [user, loading]);
 
@@ -89,8 +97,8 @@ export default function OnboardingModal() {
     try {
       await completeOnboarding(phaseValue);
     } catch (_) {}
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('phase_prompt_dismissed', 'true');
+    if (typeof window !== 'undefined' && user) {
+      sessionStorage.setItem(`phase_prompt_dismissed_${user.id}`, 'true');
     }
     setDismissed(true);
     setIsOpen(false);
@@ -111,8 +119,8 @@ export default function OnboardingModal() {
   };
 
   const handleSkip = () => {
-    if (typeof window !== 'undefined') {
-      sessionStorage.setItem('phase_prompt_dismissed', 'true');
+    if (typeof window !== 'undefined' && user) {
+      sessionStorage.setItem(`phase_prompt_dismissed_${user.id}`, 'true');
     }
     handleDismiss(null);
   };
@@ -122,14 +130,19 @@ export default function OnboardingModal() {
   const current = STEPS[step];
   const isLast = step === STEPS.length - 1;
 
+  const modalTitle = isQuickPhaseFill ? 'Quick Update: Select Your Phase' : current.title;
+  const modalDescription = isQuickPhaseFill 
+    ? 'To help personalize FAQ recommendations for your learning journey, please select your current internship phase below:' 
+    : current.description;
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={handleSkip} />
       <div className="relative bg-[var(--color-bg-secondary)] rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
         <div className="p-8 text-center max-h-[85vh] overflow-y-auto">
           <div className="flex justify-center mb-6">{current.icon}</div>
-          <h2 className="text-xl font-bold text-[var(--color-text)] mb-2">{current.title}</h2>
-          <p className="text-[var(--color-text-secondary)] text-sm leading-relaxed mb-6">{current.description}</p>
+          <h2 className="text-xl font-bold text-[var(--color-text)] mb-2">{modalTitle}</h2>
+          <p className="text-[var(--color-text-secondary)] text-sm leading-relaxed mb-6">{modalDescription}</p>
 
           {current.isPhaseSelection ? (
             <div className="flex flex-col gap-2.5 mb-6 text-left">
@@ -180,40 +193,59 @@ export default function OnboardingModal() {
         </div>
 
         <div className="px-8 pb-6">
-          <div className="flex items-center justify-between">
-            <button
-              onClick={handleBack}
-              disabled={step === 0}
-              className={`text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] ${step === 0 ? 'opacity-0' : ''}`}
-            >
-              &larr; Back
-            </button>
-
-            <div className="flex gap-1.5">
-              {STEPS.map((_, i) => (
-                <div
-                  key={i}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    i === step ? 'bg-primary-600' : i < step ? 'bg-primary-300' : 'bg-[var(--color-border)]'
-                  }`}
-                />
-              ))}
+          {isQuickPhaseFill ? (
+            <div className="flex flex-col items-center gap-3">
+              <button
+                onClick={handleNext}
+                className="w-full btn-primary py-2.5 text-sm font-semibold rounded-xl"
+              >
+                Save & Continue
+              </button>
+              <button
+                onClick={handleSkip}
+                className="text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)] transition-colors"
+              >
+                Remind me later
+              </button>
             </div>
+          ) : (
+            <>
+              <div className="flex items-center justify-between">
+                <button
+                  onClick={handleBack}
+                  disabled={step === 0}
+                  className={`text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] ${step === 0 ? 'opacity-0' : ''}`}
+                >
+                  &larr; Back
+                </button>
 
-            <button
-              onClick={handleNext}
-              className="text-sm font-medium text-primary-600 hover:text-primary-700"
-            >
-              {isLast ? 'Get Started' : 'Next \u2192'}
-            </button>
-          </div>
+                <div className="flex gap-1.5">
+                  {STEPS.map((_, i) => (
+                    <div
+                      key={i}
+                      className={`w-2 h-2 rounded-full transition-colors ${
+                        i === step ? 'bg-primary-600' : i < step ? 'bg-primary-300' : 'bg-[var(--color-border)]'
+                      }`}
+                    />
+                  ))}
+                </div>
 
-          <button
-            onClick={handleSkip}
-            className="mt-4 w-full text-center text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
-          >
-            Skip tour
-          </button>
+                <button
+                  onClick={handleNext}
+                  className="text-sm font-medium text-primary-600 hover:text-primary-700"
+                >
+                  {isLast ? 'Get Started' : 'Next \u2192'}
+                </button>
+              </div>
+
+              <button
+                onClick={handleSkip}
+                className="mt-4 w-full text-center text-xs text-[var(--color-text-secondary)] hover:text-[var(--color-text)]"
+              >
+                Skip tour
+              </button>
+            </>
+          )}
         </div>
       </div>
     </div>
