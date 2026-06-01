@@ -172,7 +172,11 @@ export default function QuestionCard({ question }) {
             ) : (
               <Link href={`/users/${question.author?.username}`} className="flex items-center gap-1.5 hover:text-[var(--color-primary)] transition-colors">
                 {question.author?.avatar ? (
-                  <img src={question.author?.avatar} alt="" className="w-5 h-5 rounded-full" />
+                  <img 
+                    src={question.author.avatar.startsWith('http') ? question.author.avatar : `${api.baseUrl.replace('/api', '')}${question.author.avatar}`} 
+                    alt="" 
+                    className="w-5 h-5 rounded-full object-cover" 
+                  />
                 ) : (
                   <span className="w-5 h-5 rounded-lg bg-gradient-to-br from-[var(--color-primary)] to-purple-500 text-white flex items-center justify-center text-[10px] font-bold">
                     {(question.author?.displayName || question.author?.username || '?')[0]}
