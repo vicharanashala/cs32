@@ -37,24 +37,32 @@ export default function FAQCard({ faq, isSelected, onSelect }) {
     <Link
       key={faq._id}
       href={`/faqs/${faq.slug}`}
-      className={`card-hover p-6 block border-2 transition-all duration-300 ${
+      className={`group bg-[var(--color-bg-secondary)]/80 backdrop-blur-md rounded-2xl border p-6 block transition-all duration-300 ${
         isSelected 
-          ? 'border-[var(--color-primary)] bg-[var(--color-primary-subtle)]' 
-          : 'border-transparent hover:border-[var(--color-primary)]/30'
+          ? 'border-[var(--color-primary)] bg-[var(--color-primary-subtle)]/20 shadow-md shadow-[var(--color-primary)]/5' 
+          : 'border-[var(--color-border)]/60 hover:border-[var(--color-primary)]/30 hover:shadow-lg hover:-translate-y-1'
       }`}
       onClick={() => onSelect && onSelect(faq._id)}
     >
       <div className="flex items-start justify-between gap-3 mb-4">
-        <div className="flex items-center gap-2 flex-wrap">
-          {faq.isOfficial && <span className="badge-green text-xs">Official</span>}
-          {faq.category && <span className="badge-gray text-xs capitalize">{faq.category}</span>}
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {faq.isOfficial && (
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              Official
+            </span>
+          )}
+          {faq.category && (
+            <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md text-[10px] font-bold bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] capitalize">
+              {faq.category}
+            </span>
+          )}
         </div>
         <button
           onClick={handleSave}
-          className={`p-2 rounded-lg shrink-0 transition-all ${
+          className={`p-2 rounded-xl shrink-0 transition-all border ${
             isSaved
-              ? 'text-[var(--color-primary)] bg-[var(--color-primary-subtle)]'
-              : 'text-[var(--color-text-muted)] hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-tertiary)]'
+              ? 'text-[var(--color-primary)] bg-[var(--color-primary-subtle)] border-[var(--color-primary)]/20'
+              : 'text-[var(--color-text-muted)] border-transparent hover:text-[var(--color-primary)] hover:bg-[var(--color-bg-tertiary)]'
           }`}
           title={isSaved ? 'Unsave' : 'Save'}
         >
@@ -63,23 +71,21 @@ export default function FAQCard({ faq, isSelected, onSelect }) {
           </svg>
         </button>
       </div>
-      <h3 className="text-lg font-semibold text-[var(--color-text)] mb-2">{faq.title}</h3>
-      <p className="text-sm text-[var(--color-text-secondary)] mb-5 line-clamp-2 leading-relaxed">{faq.description}</p>
-      <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)]">
+      <h3 className="text-base font-bold text-[var(--color-text)] mb-2 group-hover:text-[var(--color-primary)] transition-colors leading-snug">
+        {faq.title}
+      </h3>
+      <p className="text-sm text-[var(--color-text-secondary)] mb-5 line-clamp-2 leading-relaxed">
+        {faq.description}
+      </p>
+      <div className="flex items-center gap-4 text-xs text-[var(--color-text-muted)] border-t border-[var(--color-border)]/40 pt-3">
         <span className="flex items-center gap-1">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+          <svg className="w-3.5 h-3.5 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
           {faq.itemCount || 0} items
         </span>
         <span className="flex items-center gap-1">
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+          <svg className="w-3.5 h-3.5 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
           {faq.viewCount || 0} views
         </span>
-        {faq.saveCount > 0 && (
-          <span className="flex items-center gap-1">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" /></svg>
-            {faq.saveCount}
-          </span>
-        )}
       </div>
     </Link>
   );

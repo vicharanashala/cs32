@@ -1,37 +1,23 @@
 'use client';
-import { useEffect, useRef, memo } from 'react';
-
+import { useEffect, useRef, memo, useState } from 'react';
 import './DotField.css';
 
 const TWO_PI = Math.PI * 2;
 
 const DotField = memo(({
   dotRadius = 1.5,
-  dotSpacing = 14,
-  cursorRadius = 500,
-  cursorForce = 0.1,
-  bulgeOnly = true,
-  bulgeStrength = 67,
-  sparkle = false,
-  waveAmplitude = 0,
+  dotSpacing = 16,
   className,
   ...rest
 }) => {
   const canvasRef = useRef(null);
   const dotsRef = useRef([]);
-  const mouseRef = useRef({ x: -9999, y: -9999, prevX: -9999, prevY: -9999, speed: 0 });
+  const mouseRef = useRef({ x: -9999, y: -9999 });
   const rafRef = useRef(null);
   const sizeRef = useRef({ w: 0, h: 0, offsetX: 0, offsetY: 0 });
-  const engagement = useRef(0);
-  const propsRef = useRef({});
-  propsRef.current = { dotRadius, dotSpacing, cursorRadius, cursorForce, bulgeOnly, bulgeStrength, sparkle, waveAmplitude };
-  const rebuildRef = useRef(null);
   const isDarkRef = useRef(false);
 
-  const getGradientFrom = () => isDarkRef.current ? 'rgba(199, 175, 255, 0.5)' : 'rgba(99, 102, 241, 0.4)';
-  const getGradientTo = () => isDarkRef.current ? 'rgba(180, 151, 207, 0.35)' : 'rgba(79, 82, 141, 0.35)';
-  const getDotScale = () => isDarkRef.current ? 1.3 : 0.85;
-
+  // Read theme on mount and observe mutations
   useEffect(() => {
     isDarkRef.current = document.documentElement.classList.contains('dark');
     const observer = new MutationObserver(() => {
@@ -75,20 +61,18 @@ const DotField = memo(({
     }
 
     function buildDots(w, h) {
-      const p = propsRef.current;
-      const step = p.dotRadius + p.dotSpacing;
+      const step = dotRadius + dotSpacing;
       const cols = Math.floor(w / step);
       const rows = Math.floor(h / step);
       const padX = (w % step) / 2;
       const padY = (h % step) / 2;
-      const dots = new Array(rows * cols);
-      let idx = 0;
+      const dots = [];
 
       for (let row = 0; row < rows; row++) {
         for (let col = 0; col < cols; col++) {
-          const ax = padX + col * step + step / 2;
-          const ay = padY + row * step + step / 2;
-          dots[idx++] = { ax, ay, sx: ax, sy: ay, vx: 0, vy: 0, x: ax, y: ay };
+          const x = padX + col * step + step / 2;
+          const y = padY + row * step + step / 2;
+          dots.push({ x, y });
         }
       }
       dotsRef.current = dots;
@@ -100,106 +84,78 @@ const DotField = memo(({
       mouseRef.current.y = e.pageY - s.offsetY;
     }
 
-    function updateMouseSpeed() {
-      const m = mouseRef.current;
-      const dx = m.prevX - m.x;
-      const dy = m.prevY - m.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-      m.speed += (dist - m.speed) * 0.5;
-      if (m.speed < 0.001) m.speed = 0;
-      m.prevX = m.x;
-      m.prevY = m.y;
+    function onMouseLeave() {
+      mouseRef.current.x = -9999;
+      mouseRef.current.y = -9999;
     }
 
-    const speedInterval = setInterval(updateMouseSpeed, 20);
-
-    let frameCount = 0;
-
     function tick() {
-      frameCount++;
       const dots = dotsRef.current;
       const m = mouseRef.current;
       const { w, h } = sizeRef.current;
-      const p = propsRef.current;
       const len = dots.length;
-      const t = frameCount * 0.02;
-
-      const targetEngagement = Math.min(m.speed / 5, 1);
-      engagement.current += (targetEngagement - engagement.current) * 0.06;
-      if (engagement.current < 0.001) engagement.current = 0;
-      const eng = engagement.current;
 
       ctx.clearRect(0, 0, w, h);
 
-      const grad = ctx.createLinearGradient(0, 0, w, h);
-      grad.addColorStop(0, getGradientFrom());
-      grad.addColorStop(1, getGradientTo());
-      ctx.fillStyle = grad;
+      const isDark = isDarkRef.current;
+      const baseOpacity = isDark ? 0.05 : 0.04;
+      const activeOpacityBoost = isDark ? 0.35 : 0.25;
+      const dotColor = isDark ? '255, 255, 255' : '99, 102, 241'; // white in dark, indigo in light
+      const glowColor = isDark ? '99, 102, 241' : '79, 70, 229'; // Indigo primary
 
-      const cr = p.cursorRadius;
-      const crSq = cr * cr;
-      const rad = (p.dotRadius / 2) * getDotScale();
-      const isBulge = p.bulgeOnly;
-
-      ctx.beginPath();
-
-      for (let i = 0; i < len; i++) {
-        const d = dots[i];
-        const dx = m.x - d.ax;
-        const dy = m.y - d.ay;
-        const distSq = dx * dx + dy * dy;
-
-        if (distSq < crSq && eng > 0.01) {
-          const dist = Math.sqrt(distSq);
-          if (isBulge) {
-            const t = 1 - dist / cr;
-            const push = t * t * p.bulgeStrength * eng;
-            const angle = Math.atan2(dy, dx);
-            d.sx += (d.ax - Math.cos(angle) * push - d.sx) * 0.15;
-            d.sy += (d.ay - Math.sin(angle) * push - d.sy) * 0.15;
-          } else {
-            const angle = Math.atan2(dy, dx);
-            const move = (500 / dist) * (m.speed * p.cursorForce);
-            d.vx += Math.cos(angle) * -move;
-            d.vy += Math.sin(angle) * -move;
-          }
-        } else if (isBulge) {
-          d.sx += (d.ax - d.sx) * 0.1;
-          d.sy += (d.ay - d.sy) * 0.1;
-        }
-
-        if (!isBulge) {
-          d.vx *= 0.9;
-          d.vy *= 0.9;
-          d.x = d.ax + d.vx;
-          d.y = d.ay + d.vy;
-          d.sx += (d.x - d.sx) * 0.1;
-          d.sy += (d.y - d.sy) * 0.1;
-        }
-
-        let drawX = d.sx;
-        let drawY = d.sy;
-        if (p.waveAmplitude > 0) {
-          drawY += Math.sin(d.ax * 0.03 + t) * p.waveAmplitude;
-          drawX += Math.cos(d.ay * 0.03 + t * 0.7) * p.waveAmplitude * 0.5;
-        }
-
-        if (p.sparkle) {
-          const hash = ((i * 2654435761) ^ (frameCount >> 3)) >>> 0;
-          if ((hash % 100) < 3) {
-            ctx.moveTo(drawX + rad * 1.8, drawY);
-            ctx.arc(drawX, drawY, rad * 1.8, 0, TWO_PI);
-          } else {
-            ctx.moveTo(drawX + rad, drawY);
-            ctx.arc(drawX, drawY, rad, 0, TWO_PI);
-          }
-        } else {
-          ctx.moveTo(drawX + rad, drawY);
-          ctx.arc(drawX, drawY, rad, 0, TWO_PI);
-        }
+      // 1. Draw a soft interactive ambient glow behind the cursor
+      if (m.x !== -9999 && m.y !== -9999) {
+        const glowRadius = 380;
+        const glowGrad = ctx.createRadialGradient(
+          m.x, m.y, 0,
+          m.x, m.y, glowRadius
+        );
+        glowGrad.addColorStop(0, `rgba(${glowColor}, ${isDark ? 0.08 : 0.05})`);
+        glowGrad.addColorStop(0.5, `rgba(${glowColor}, ${isDark ? 0.025 : 0.015})`);
+        glowGrad.addColorStop(1, 'rgba(0, 0, 0, 0)');
+        
+        ctx.fillStyle = glowGrad;
+        ctx.beginPath();
+        ctx.arc(m.x, m.y, glowRadius, 0, TWO_PI);
+        ctx.fill();
       }
 
+      const cr = 160; // spotlight radius for interactive dots
+      const crSq = cr * cr;
+      const baseRad = dotRadius * (isDark ? 1.0 : 0.85);
+
+      // 2. Draw the base grid of dots in one single batch (incredibly fast)
+      ctx.fillStyle = `rgba(${dotColor}, ${baseOpacity})`;
+      ctx.beginPath();
+      for (let i = 0; i < len; i++) {
+        const d = dots[i];
+        ctx.moveTo(d.x + baseRad, d.y);
+        ctx.arc(d.x, d.y, baseRad, 0, TWO_PI);
+      }
       ctx.fill();
+
+      // 3. Draw active/glowing dots near the mouse on top
+      if (m.x !== -9999 && m.y !== -9999) {
+        for (let i = 0; i < len; i++) {
+          const d = dots[i];
+          const dx = m.x - d.x;
+          const dy = m.y - d.y;
+          const distSq = dx * dx + dy * dy;
+
+          if (distSq < crSq) {
+            const dist = Math.sqrt(distSq);
+            const ratio = 1 - dist / cr; // 0 to 1
+            const easeRatio = ratio * ratio * ratio; // Cubic curve for steeper focus falloff
+            const activeRad = baseRad * (1 + easeRatio * 0.9);
+            const activeOpacity = baseOpacity + easeRatio * activeOpacityBoost;
+
+            ctx.fillStyle = `rgba(${dotColor}, ${activeOpacity})`;
+            ctx.beginPath();
+            ctx.arc(d.x, d.y, activeRad, 0, TWO_PI);
+            ctx.fill();
+          }
+        }
+      }
 
       rafRef.current = requestAnimationFrame(tick);
     }
@@ -207,25 +163,16 @@ const DotField = memo(({
     doResize();
     window.addEventListener('resize', resize);
     window.addEventListener('mousemove', onMouseMove, { passive: true });
+    document.addEventListener('mouseleave', onMouseLeave);
     rafRef.current = requestAnimationFrame(tick);
-
-    rebuildRef.current = () => {
-      const { w, h } = sizeRef.current;
-      if (w > 0 && h > 0) buildDots(w, h);
-    };
 
     return () => {
       cancelAnimationFrame(rafRef.current);
-      clearInterval(speedInterval);
       clearTimeout(resizeTimer);
       window.removeEventListener('resize', resize);
       window.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseleave', onMouseLeave);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  useEffect(() => {
-    rebuildRef.current?.();
   }, [dotRadius, dotSpacing]);
 
   return (

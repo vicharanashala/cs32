@@ -2,6 +2,7 @@ const router = require('express').Router();
 const { auth, optionalAuth } = require('../middleware/auth');
 const ctrl = require('../controllers/userController');
 
+router.get('/leaderboard', ctrl.getLeaderboard);
 router.get('/:username', ctrl.getUserProfile);
 router.get('/:username/questions', ctrl.getUserQuestions);
 router.get('/:username/answers', ctrl.getUserAnswers);

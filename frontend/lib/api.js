@@ -14,11 +14,13 @@ class ApiClient {
 
   async request(endpoint, options = {}) {
     const token = this.getToken();
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+    const headers = { ...options.headers };
     if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const isFormData = options.body instanceof FormData;
+    if (!isFormData && !headers['Content-Type']) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     const res = await fetch(`${this.baseUrl}${endpoint}`, {
       ...options,
@@ -47,15 +49,27 @@ class ApiClient {
   }
 
   post(endpoint, body) {
-    return this.request(endpoint, { method: 'POST', body: JSON.stringify(body) });
+    const isFormData = body instanceof FormData;
+    return this.request(endpoint, { 
+      method: 'POST', 
+      body: isFormData ? body : JSON.stringify(body) 
+    });
   }
 
   put(endpoint, body) {
-    return this.request(endpoint, { method: 'PUT', body: JSON.stringify(body) });
+    const isFormData = body instanceof FormData;
+    return this.request(endpoint, { 
+      method: 'PUT', 
+      body: isFormData ? body : JSON.stringify(body) 
+    });
   }
 
   patch(endpoint, body) {
-    return this.request(endpoint, { method: 'PATCH', body: JSON.stringify(body) });
+    const isFormData = body instanceof FormData;
+    return this.request(endpoint, { 
+      method: 'PATCH', 
+      body: isFormData ? body : JSON.stringify(body) 
+    });
   }
 
   delete(endpoint) {

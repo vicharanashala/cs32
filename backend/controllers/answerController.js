@@ -9,6 +9,7 @@ const { paginate, buildPaginationMeta } = require('../utils/helpers');
 const { emitToUser, emitToQuestion } = require('../socket');
 const { indexQuestion } = require('../services/searchService');
 const { flagContent, clearFlag } = require('../services/moderationService');
+const { broadcastLeaderboard } = require('../services/leaderboardService');
 
 exports.createAnswer = async (req, res, next) => {
   try {
@@ -213,6 +214,7 @@ exports.acceptAnswer = async (req, res, next) => {
       });
     }
 
+    broadcastLeaderboard();
     res.json({ answer, message: 'Answer accepted' });
   } catch (err) {
     next(err);
@@ -251,6 +253,7 @@ exports.unacceptAnswer = async (req, res, next) => {
     // Remove reputation reward
     await User.findByIdAndUpdate(answer.author, { $inc: { reputation: -15 } });
 
+    broadcastLeaderboard();
     res.json({ answer, message: 'Answer unaccepted' });
   } catch (err) {
     next(err);
@@ -280,6 +283,7 @@ exports.toggleSolvedMyDoubt = async (req, res, next) => {
       solvedMyDoubtCount: answer.solvedMyDoubtCount,
     });
 
+    broadcastLeaderboard();
     res.json({
       solvedMyDoubtCount: answer.solvedMyDoubtCount,
       hasSolvedMyDoubt: !alreadySolved,
