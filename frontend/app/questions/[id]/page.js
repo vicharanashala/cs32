@@ -410,10 +410,18 @@ export default function QuestionDetailPage() {
               <span>Anonymous Student</span>
             </span>
           ) : (
-            <Link href={`/users/${question.author?.username}`} className="flex items-center gap-1 hover:text-primary-600">
-              <div className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-[10px] font-medium">
-                {(question.author?.displayName || question.author?.username || '?')[0]}
-              </div>
+            <Link href={`/users/${question.author?.username}`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors">
+              {question.author?.avatar ? (
+                <img 
+                  src={question.author.avatar.startsWith('http') ? question.author.avatar : `${api.baseUrl.replace('/api', '')}${question.author.avatar}`} 
+                  alt="" 
+                  className="w-5 h-5 rounded-full object-cover" 
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-primary-100 text-primary-600 flex items-center justify-center text-[10px] font-medium">
+                  {(question.author?.displayName || question.author?.username || '?')[0]}
+                </div>
+              )}
               <span>{question.author?.displayName || question.author?.username}</span>
             </Link>
           )}
@@ -509,10 +517,18 @@ export default function QuestionDetailPage() {
                       <MarkdownRenderer content={answer.body} />
                       <div className="mt-4 flex items-center justify-between">
                         <div className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-                          <Link href={`/users/${answer.author?.username}`} className="flex items-center gap-1 hover:text-primary-600">
-              <div className="w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-300 flex items-center justify-center text-[10px] font-medium">
-                              {(answer.author?.displayName || answer.author?.username || '?')[0]}
-                            </div>
+                          <Link href={`/users/${answer.author?.username}`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors">
+                            {answer.author?.avatar ? (
+                              <img 
+                                src={answer.author.avatar.startsWith('http') ? answer.author.avatar : `${api.baseUrl.replace('/api', '')}${answer.author.avatar}`} 
+                                alt="" 
+                                className="w-5 h-5 rounded-full object-cover" 
+                              />
+                            ) : (
+                              <div className="w-5 h-5 rounded-full bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-300 flex items-center justify-center text-[10px] font-medium">
+                                {(answer.author?.displayName || answer.author?.username || '?')[0]}
+                              </div>
+                            )}
                             <span>{answer.author?.displayName || answer.author?.username}</span>
                           </Link>
                           <span>answered {formatDate(answer.createdAt)}</span>
