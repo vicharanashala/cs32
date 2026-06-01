@@ -33,6 +33,7 @@
 - [x] Search result caching (Redis 60s)
 - [x] Tag browsing and filtering
 - [x] Sort options (newest, active, votes, views, etc.)
+- [x] Hybrid Search Engine (combines Elasticsearch standard text queries with Mongoose database regex search fallback and JS stop-word cleaning to deliver high relevance and reliability)
 
 ### User System
 - [x] Registration / Login / Logout
