@@ -100,7 +100,9 @@ function SearchPageContent() {
             key={t}
             onClick={() => { setType(t); if (query) router.push(`/search?q=${encodeURIComponent(query)}&type=${t}`); }}
             className={`px-3 py-1.5 text-sm rounded-lg font-medium capitalize transition-colors ${
-              type === t ? 'bg-primary-600 text-white' : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600'
+              type === t
+                ? 'bg-[var(--color-primary)] text-white shadow-sm'
+                : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]'
             }`}
           >
             {t || 'All'}
