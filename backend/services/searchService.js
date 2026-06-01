@@ -240,21 +240,25 @@ const doesMatchExactly = (q, text) => {
 };
 
 const calculateMongoScore = (query, doc, terms) => {
-  const title = doc.title || doc.question || doc.faqTitle || doc.displayName || doc.username || '';
-  if (doesMatchExactly(query, title)) return 1.0;
+  const matchTarget = doc.question || doc.title || doc.displayName || doc.username || '';
+  if (doesMatchExactly(query, matchTarget)) return 1.0;
 
   const cleanQ = query ? query.toLowerCase().trim() : '';
-  const cleanTitle = title.toLowerCase();
+  const cleanTarget = matchTarget.toLowerCase();
 
-  if (cleanQ && cleanTitle.includes(cleanQ)) return 0.9;
+  if (cleanQ && cleanTarget.includes(cleanQ)) return 0.9;
+
+  if (doc.faqTitle && cleanQ && doc.faqTitle.toLowerCase().includes(cleanQ)) {
+    return 0.85;
+  }
 
   if (terms && terms.length > 0) {
-    const termInTitle = terms.some(t => cleanTitle.includes(t.toLowerCase()));
-    if (termInTitle) return 0.85;
+    const termInTarget = terms.some(t => cleanTarget.includes(t.toLowerCase()));
+    if (termInTarget) return 0.8;
   }
 
   const desc = doc.body || doc.description || doc.answer || doc.bio || '';
-  if (cleanQ && desc.toLowerCase().includes(cleanQ)) return 0.8;
+  if (cleanQ && desc.toLowerCase().includes(cleanQ)) return 0.75;
 
   return 0.7;
 };
@@ -386,18 +390,18 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
       [INDEX_USERS]: 'user',
     };
 
-    const maxScore = result.hits.max_score || 1.0;
+    const maxScore = result.hits.hits.length > 0 ? Math.max(...result.hits.hits.map(h => h._score || 0)) : 1.0;
     esResults = result.hits.hits.map(h => {
-      const title = h._source.title || h._source.question || h._source.faqTitle || h._source.displayName || h._source.username || '';
-      const exact = doesMatchExactly(query, title);
+      const matchTarget = h._source.question || h._source.title || h._source.displayName || h._source.username || '';
+      const exact = doesMatchExactly(query, matchTarget);
       
       let normScore = exact ? 1.0 : (maxScore > 0 ? (h._score / maxScore) * 0.95 : 0.95);
       if (normScore > 1.0) normScore = 1.0;
       if (normScore < 0.1) normScore = 0.1;
 
       return {
-        id: h._id,
         ...h._source,
+        id: h._id,
         _type: indexToType[h._index] || 'unknown',
         score: normScore,
       };
