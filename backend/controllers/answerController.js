@@ -140,7 +140,8 @@ exports.deleteAnswer = async (req, res, next) => {
   try {
     const answer = await Answer.findById(req.params.id);
     if (!answer || answer.isDeleted) throw new AppError('Answer not found', 404);
-    if (answer.author.toString() !== req.user._id.toString() && req.user.role !== 'admin') {
+    const isModOrAdmin = req.user.role === 'admin' || req.user.role === 'moderator';
+    if (answer.author.toString() !== req.user._id.toString() && !isModOrAdmin) {
       throw new AppError('Not authorized', 403);
     }
 

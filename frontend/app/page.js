@@ -4,6 +4,7 @@ import Link from 'next/link';
 import api from '@/lib/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
+import MarkdownRenderer from '@/components/MarkdownRenderer';
 
 const CATEGORY_ICONS = {
   'About the internship': '💼',
@@ -52,12 +53,13 @@ export default function HomePage() {
         if (!categoryMap[cat]) {
           categoryMap[cat] = { name: cat, count: 0, items: [] };
         }
-        categoryMap[cat].count += faq.itemCount || 0;
+        const itemCount = faq.items ? faq.items.filter(i => i.isPublished).length : 0;
+        categoryMap[cat].count += itemCount;
         categoryMap[cat].items.push(faq);
       });
 
       const sortedCategories = Object.values(categoryMap).sort((a, b) => b.count - a.count);
-      setCategories([{ name: 'All Categories', count: faqList.reduce((acc, f) => acc + (f.itemCount || 0), 0) }, ...sortedCategories]);
+      setCategories([{ name: 'All Categories', count: faqList.reduce((acc, f) => acc + (f.items ? f.items.filter(i => i.isPublished).length : 0), 0) }, ...sortedCategories]);
       setFaqs(faqList);
     } catch (err) {
       console.error('Failed to load FAQs:', err);
@@ -77,13 +79,20 @@ export default function HomePage() {
   const handleFeedback = async (faqId, itemId, helpful) => {
     if (!user) { toast.error('Please login to vote'); return; }
     const currentVote = localVotes[itemId];
-    if (currentVote === (helpful ? 'helpful' : 'notHelpful')) {
-      toast.error('You have already voted');
-      return;
-    }
+    const isUndo = currentVote === (helpful ? 'helpful' : 'notHelpful');
     try {
-      const data = await api.post(`/faqs/${faqId}/items/${itemId}/feedback`, { helpful });
-      setLocalVotes(prev => ({ ...prev, [itemId]: helpful ? 'helpful' : 'notHelpful' }));
+      const data = await api.post(`/faqs/${faqId}/items/${itemId}/feedback`, { helpful, undo: isUndo });
+      if (data.voted === null) {
+        setLocalVotes(prev => {
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        });
+        toast.success('Vote removed');
+      } else {
+        setLocalVotes(prev => ({ ...prev, [itemId]: data.voted }));
+        toast.success(helpful ? 'Glad this helped!' : 'Thanks for the feedback');
+      }
       setFaqs(prev => prev.map(faq => {
         if (faq._id !== faqId) return faq;
         return {
@@ -94,7 +103,6 @@ export default function HomePage() {
           })
         };
       }));
-      toast.success(helpful ? 'Glad this helped!' : 'Thanks for the feedback');
     } catch (err) {
       toast.error(err.message);
     }
@@ -122,6 +130,12 @@ export default function HomePage() {
 
   const getIcon = (category) => {
     return CATEGORY_ICONS[category] || '📌';
+  };
+
+  const isFaqFresh = (faq) => {
+    if (!faq.items || faq.items.length === 0) return false;
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    return faq.items.some(item => item.lastReviewed && new Date(item.lastReviewed).getTime() > sevenDaysAgo);
   };
 
   return (
