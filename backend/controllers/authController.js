@@ -94,3 +94,94 @@ exports.updateProfile = async (req, res, next) => {
     next(err);
   }
 };
+
+const generateUniqueUsername = async (email) => {
+  const base = email.split('@')[0].replace(/[^a-zA-Z0-9]/g, '').substring(0, 20) || 'user';
+  let username = base;
+  let exists = await User.findOne({ username });
+  let counter = 1;
+  while (exists) {
+    username = `${base}${counter}`;
+    exists = await User.findOne({ username });
+    counter++;
+  }
+  return username;
+};
+
+exports.googleLogin = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      throw new AppError('Google ID token is required', 400);
+    }
+
+    // Verify token with Google's tokeninfo endpoint
+    const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+    if (!response.ok) {
+      throw new AppError('Invalid Google ID token', 401);
+    }
+
+    const payload = await response.json();
+    const { sub, email, name, picture } = payload;
+
+    if (!email) {
+      throw new AppError('Email not returned from Google', 400);
+    }
+
+    let user = await User.findOne({ googleId: sub });
+
+    if (user) {
+      if (user.isBanned) {
+        throw new AppError(`Account banned: ${user.banReason}`, 403);
+      }
+      user.lastActive = new Date();
+      if (picture && user.avatarUrl !== picture) {
+        user.avatarUrl = picture;
+      }
+      await user.save();
+      const jwtToken = generateToken(user);
+      return res.json({ token: jwtToken, user: user.toPublicJSON() });
+    }
+
+    user = await User.findOne({ email });
+
+    if (user) {
+      if (user.isBanned) {
+        throw new AppError(`Account banned: ${user.banReason}`, 403);
+      }
+      user.googleId = sub;
+      user.authProvider = 'both';
+      if (picture && !user.avatarUrl) {
+        user.avatarUrl = picture;
+      }
+      user.lastActive = new Date();
+      await user.save();
+      await indexUser(user);
+      const jwtToken = generateToken(user);
+      return res.json({ token: jwtToken, user: user.toPublicJSON() });
+    }
+
+    // Auto-create Google user
+    const username = await generateUniqueUsername(email);
+    user = await User.create({
+      username,
+      email,
+      displayName: name || username,
+      googleId: sub,
+      avatarUrl: picture || '',
+      authProvider: 'google',
+      hasCompletedOnboarding: false,
+    });
+
+    await indexUser(user);
+    const jwtToken = generateToken(user);
+
+    res.status(201).json({
+      token: jwtToken,
+      user: user.toPublicJSON(),
+      isNew: true
+    });
+  } catch (err) {
+    next(err);
+  }
+};

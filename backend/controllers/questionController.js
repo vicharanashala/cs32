@@ -57,6 +57,9 @@ exports.createQuestion = async (req, res, next) => {
 
     const question = await Question.create(questionData);
 
+    const { processAnomalyClassification } = require('../services/anomalyService');
+    await processAnomalyClassification(question._id);
+
     if (existingQuestion) {
       await Question.findByIdAndUpdate(existingQuestion.question._id, {
         $addToSet: { relatedQuestions: question._id },
@@ -608,6 +611,30 @@ exports.escalateQuestion = async (req, res, next) => {
     ));
 
     res.json({ message: 'Question escalated', question });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.selfEscalateAnomaly = async (req, res, next) => {
+  try {
+    const question = await Question.findById(req.params.id);
+    if (!question) throw new AppError('Question not found', 404);
+    
+    if (question.author.toString() !== req.user._id.toString()) {
+      throw new AppError('Only the author can self-escalate their question', 403);
+    }
+
+    question.anomalySeverity = 'high';
+    question.anomalyScore = Math.max(85, question.anomalyScore || 0);
+    question.alertSent = true;
+    await question.save();
+
+    const { alertAdminsAndModerators } = require('../services/anomalyService');
+    const subject = `[SELF-ESCALATED HIGH ALERT] User query marked urgent by author`;
+    await alertAdminsAndModerators(question, subject);
+
+    res.json({ message: 'Question successfully escalated to urgent status', question });
   } catch (err) {
     next(err);
   }

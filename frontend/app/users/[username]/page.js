@@ -106,9 +106,9 @@ export default function UserProfilePage() {
       <div className="bg-[var(--color-bg-secondary)]/80 backdrop-blur-md border border-[var(--color-border)]/60 rounded-2xl p-6 mb-8 relative">
         <div className="flex flex-col sm:flex-row items-start justify-between gap-6">
           <div className="flex items-start gap-4 flex-1">
-            {user.avatar ? (
+            {user.avatar || user.avatarUrl ? (
               <img
-                src={getAvatarUrl(user.avatar)}
+                src={getAvatarUrl(user.avatar || user.avatarUrl)}
                 alt={user.displayName || user.username}
                 className="w-16 h-16 rounded-full object-cover shrink-0 border-2 border-[var(--color-primary)]/20"
               />

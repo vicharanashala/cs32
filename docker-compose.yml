@@ -75,6 +75,8 @@ services:
         condition: service_healthy
       elasticsearch:
         condition: service_healthy
+    env_file:
+      - secrets.env
     volumes:
       - ./backend:/app
       - ./metadata.json:/metadata.json:ro
@@ -104,6 +106,8 @@ services:
       - "3000:3000"
     depends_on:
       - backend
+    env_file:
+      - secrets.env
     volumes:
       - ./frontend:/app
       - /app/node_modules
