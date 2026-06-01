@@ -52,6 +52,9 @@ export default function Navbar({ onSearch }) {
               <Link href="/tags" className="px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-tertiary)] rounded-md transition-colors">
                 Tags
               </Link>
+              <Link href="/users" className="px-3 py-2 text-sm text-[var(--color-text-secondary)] hover:text-[var(--color-text)] hover:bg-[var(--color-bg-tertiary)] rounded-md transition-colors">
+                Community
+              </Link>
             </div>
           </div>
 
@@ -187,6 +190,7 @@ export default function Navbar({ onSearch }) {
               <Link href="/questions" className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] rounded-lg transition-colors">Questions</Link>
               <Link href="/faqs" className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] rounded-lg transition-colors">FAQs</Link>
               <Link href="/tags" className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] rounded-lg transition-colors">Tags</Link>
+              <Link href="/users" className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-tertiary)] rounded-lg transition-colors">Community</Link>
               {user && <Link href="/questions/ask" className="flex items-center gap-2 px-3 py-2.5 text-sm text-[var(--color-primary)] font-medium hover:bg-[var(--color-primary-subtle)] rounded-lg transition-colors">Ask Question</Link>}
             </div>
           </div>

@@ -6,6 +6,7 @@ const SavedQuestion = require('../models/SavedQuestion');
 const SavedFAQ = require('../models/SavedFAQ');
 const { AppError } = require('../middleware/errorHandler');
 const { paginate, buildPaginationMeta } = require('../utils/helpers');
+const { getLeaderboardData } = require('../services/leaderboardService');
 
 exports.getUserProfile = async (req, res, next) => {
   try {
@@ -259,6 +260,15 @@ exports.updateSavedFAQ = async (req, res, next) => {
 
     await saved.save();
     res.json({ message: 'Saved FAQ updated', saved });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getLeaderboard = async (req, res, next) => {
+  try {
+    const data = await getLeaderboardData();
+    res.json({ leaderboard: data });
   } catch (err) {
     next(err);
   }
