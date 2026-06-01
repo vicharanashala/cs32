@@ -233,6 +233,31 @@ const cleanSearchQuery = (queryStr) => {
   const filtered = words.filter(w => !STOP_WORDS.has(w));
   return filtered.join(' ').trim() || queryStr;
 };
+const doesMatchExactly = (q, text) => {
+  if (!q || !text) return false;
+  const cleanStr = (s) => s.toLowerCase().replace(/[^\w]/g, '').trim();
+  return cleanStr(q) === cleanStr(text);
+};
+
+const calculateMongoScore = (query, doc, terms) => {
+  const title = doc.title || doc.question || doc.faqTitle || doc.displayName || doc.username || '';
+  if (doesMatchExactly(query, title)) return 1.0;
+
+  const cleanQ = query ? query.toLowerCase().trim() : '';
+  const cleanTitle = title.toLowerCase();
+
+  if (cleanQ && cleanTitle.includes(cleanQ)) return 0.9;
+
+  if (terms && terms.length > 0) {
+    const termInTitle = terms.some(t => cleanTitle.includes(t.toLowerCase()));
+    if (termInTitle) return 0.85;
+  }
+
+  const desc = doc.body || doc.description || doc.answer || doc.bio || '';
+  if (cleanQ && desc.toLowerCase().includes(cleanQ)) return 0.8;
+
+  return 0.7;
+};
 
 const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
   try {
@@ -361,12 +386,22 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
       [INDEX_USERS]: 'user',
     };
 
-    esResults = result.hits.hits.map(h => ({
-      id: h._id,
-      ...h._source,
-      _type: indexToType[h._index] || 'unknown',
-      score: h._score,
-    }));
+    const maxScore = result.hits.max_score || 1.0;
+    esResults = result.hits.hits.map(h => {
+      const title = h._source.title || h._source.question || h._source.faqTitle || h._source.displayName || h._source.username || '';
+      const exact = doesMatchExactly(query, title);
+      
+      let normScore = exact ? 1.0 : (maxScore > 0 ? (h._score / maxScore) : 1.0);
+      if (normScore > 1.0) normScore = 1.0;
+      if (normScore < 0.1) normScore = 0.1;
+
+      return {
+        id: h._id,
+        ...h._source,
+        _type: indexToType[h._index] || 'unknown',
+        score: normScore,
+      };
+    });
     esTotal = result.hits.total.value;
   } catch (err) {
     console.error('ES Search error, falling back to DB:', err.message);
@@ -401,16 +436,21 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
           .populate('author', 'username displayName')
           .limit(50)
           .lean()
-          .then(qs => qs.map(q => ({
-            id: q._id.toString(),
-            title: q.title,
-            body: q.body,
-            tags: q.tags || [],
-            authorName: q.author ? (q.author.displayName || q.author.username) : 'anonymous',
-            createdAt: q.createdAt,
-            _type: 'question',
-            score: 1.0,
-          })))
+          .then(qs => qs.map(q => {
+            const doc = {
+              id: q._id.toString(),
+              title: q.title,
+              body: q.body,
+              tags: q.tags || [],
+              authorName: q.author ? (q.author.displayName || q.author.username) : 'anonymous',
+              createdAt: q.createdAt,
+              _type: 'question',
+            };
+            return {
+              ...doc,
+              score: calculateMongoScore(query, doc, terms),
+            };
+          }))
       );
     }
 
@@ -440,15 +480,19 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
                 (f.description && f.description.toLowerCase().includes(term))
               );
               if (pageMatches) {
-                items.push({
+                const doc = {
                   id: f._id.toString(),
+                  slug: f.slug,
                   title: f.title,
                   description: f.description,
                   category: f.category,
                   tags: f.tags,
                   createdAt: f.createdAt,
                   _type: 'faq',
-                  score: 1.0,
+                };
+                items.push({
+                  ...doc,
+                  score: calculateMongoScore(query, doc, terms),
                 });
               }
               for (const item of f.items || []) {
@@ -458,16 +502,20 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
                   item.answer.toLowerCase().includes(term)
                 );
                 if (itemMatches) {
-                  items.push({
+                  const doc = {
                     id: `${f._id.toString()}_${item._id.toString()}`,
                     faqId: f._id.toString(),
+                    slug: f.slug,
                     faqTitle: f.title,
                     question: item.question,
                     answer: item.answer,
                     tags: item.tags,
                     createdAt: item.createdAt,
                     _type: 'faq',
-                    score: 1.0,
+                  };
+                  items.push({
+                    ...doc,
+                    score: calculateMongoScore(query, doc, terms),
                   });
                 }
               }
@@ -493,16 +541,21 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
         User.find(uFilter)
           .limit(50)
           .lean()
-          .then(us => us.map(u => ({
-            id: u._id.toString(),
-            username: u.username,
-            displayName: u.displayName || u.username,
-            bio: u.bio || '',
-            reputation: u.reputation || 0,
-            createdAt: u.createdAt,
-            _type: 'user',
-            score: 1.0,
-          })))
+          .then(us => us.map(u => {
+            const doc = {
+              id: u._id.toString(),
+              username: u.username,
+              displayName: u.displayName || u.username,
+              bio: u.bio || '',
+              reputation: u.reputation || 0,
+              createdAt: u.createdAt,
+              _type: 'user',
+            };
+            return {
+              ...doc,
+              score: calculateMongoScore(query, doc, terms),
+            };
+          }))
       );
     }
 

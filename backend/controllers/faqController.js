@@ -76,7 +76,18 @@ exports.getFAQs = async (req, res, next) => {
 
 exports.getFAQBySlug = async (req, res, next) => {
   try {
-    const faq = await FAQ.findOne({ slug: req.params.slug, isPublished: true })
+    const mongoose = require('mongoose');
+    const query = { isPublished: true };
+    if (mongoose.Types.ObjectId.isValid(req.params.slug)) {
+      query.$or = [
+        { _id: req.params.slug },
+        { slug: req.params.slug }
+      ];
+    } else {
+      query.slug = req.params.slug;
+    }
+
+    const faq = await FAQ.findOne(query)
       .populate('author', 'username displayName avatar')
       .populate('items.reviewedBy', 'username displayName');
 
