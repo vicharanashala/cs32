@@ -2,17 +2,25 @@
 import { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
+import { useAuth } from '@/context/AuthContext';
 import QuestionCard from '@/components/QuestionCard';
+import FAQCard from '@/components/FAQCard';
 import { formatDate, getInitials } from '@/lib/utils';
 import api from '@/lib/api';
 
 export default function UserProfilePage() {
   const { username } = useParams();
+  const { user: currentUser } = useAuth();
   const [user, setUser] = useState(null);
   const [questions, setQuestions] = useState([]);
   const [answers, setAnswers] = useState([]);
+  const [savedQuestions, setSavedQuestions] = useState([]);
+  const [savedFaqs, setSavedFaqs] = useState([]);
   const [tab, setTab] = useState('questions');
+  const [savedSubTab, setSavedSubTab] = useState('questions');
   const [loading, setLoading] = useState(true);
+
+  const isOwnProfile = currentUser?.username === username;
 
   useEffect(() => {
     api.get(`/users/${username}`)
@@ -24,10 +32,13 @@ export default function UserProfilePage() {
   useEffect(() => {
     if (tab === 'questions') {
       api.get(`/users/${username}/questions`).then(d => setQuestions(d.questions || [])).catch(() => {});
-    } else {
+    } else if (tab === 'answers') {
       api.get(`/users/${username}/answers`).then(d => setAnswers(d.answers || [])).catch(() => {});
+    } else if (tab === 'saved' && isOwnProfile) {
+      api.get('/users/me/saved').then(d => setSavedQuestions(d.saved || [])).catch(() => {});
+      api.get('/users/me/saved/faqs').then(d => setSavedFaqs(d.saved || [])).catch(() => {});
     }
-  }, [username, tab]);
+  }, [username, tab, isOwnProfile]);
 
   if (loading) {
     return (
@@ -59,11 +70,11 @@ export default function UserProfilePage() {
             {getInitials(user.displayName || user.username)}
           </div>
           <div className="flex-1">
-            <h1 className="text-xl font-bold text-gray-900">{user.displayName || user.username}</h1>
-            <p className="text-sm text-gray-500">@{user.username}</p>
-            {user.bio && <p className="text-sm text-gray-700 mt-2">{user.bio}</p>}
-            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-gray-500">
-              <span className="font-semibold text-gray-900">{user.reputation}</span> reputation
+            <h1 className="text-xl font-bold text-[var(--color-text)]">{user.displayName || user.username}</h1>
+            <p className="text-sm text-[var(--color-text-secondary)]">@{user.username}</p>
+            {user.bio && <p className="text-sm text-[var(--color-text-secondary)] mt-2">{user.bio}</p>}
+            <div className="flex flex-wrap items-center gap-4 mt-3 text-sm text-[var(--color-text-secondary)]">
+              <span className="font-semibold text-[var(--color-text)]">{user.reputation}</span> reputation
               {user.location && <span>{user.location}</span>}
               {user.website && (
                 <a href={user.website} target="_blank" rel="noopener noreferrer" className="text-primary-600 hover:text-primary-700">
@@ -74,12 +85,12 @@ export default function UserProfilePage() {
             </div>
             <div className="flex items-center gap-4 mt-3">
               <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{user.questionCount || 0}</p>
-                <p className="text-xs text-gray-500">Questions</p>
+                <p className="text-lg font-bold text-[var(--color-text)]">{user.questionCount || 0}</p>
+                <p className="text-xs text-[var(--color-text-secondary)]">Questions</p>
               </div>
               <div className="text-center">
-                <p className="text-lg font-bold text-gray-900">{user.answerCount || 0}</p>
-                <p className="text-xs text-gray-500">Answers</p>
+                <p className="text-lg font-bold text-[var(--color-text)]">{user.answerCount || 0}</p>
+                <p className="text-xs text-[var(--color-text-secondary)]">Answers</p>
               </div>
             </div>
           </div>
@@ -92,7 +103,7 @@ export default function UserProfilePage() {
           </div>
         </div>
         {user.badges?.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-4 pt-3 border-t border-gray-100">
+          <div className="flex flex-wrap gap-1 mt-4 pt-3 border-t border-[var(--color-border)]">
             {user.badges.map(badge => (
               <span key={badge} className="badge-yellow text-xs">{badge}</span>
             ))}
@@ -101,11 +112,11 @@ export default function UserProfilePage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-4 border-b border-gray-200">
+      <div className="flex gap-1 mb-4 border-b border-[var(--color-border)]">
         <button
           onClick={() => setTab('questions')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === 'questions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            tab === 'questions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
           }`}
         >
           Questions ({user.questionCount || 0})
@@ -113,38 +124,92 @@ export default function UserProfilePage() {
         <button
           onClick={() => setTab('answers')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
-            tab === 'answers' ? 'border-primary-600 text-primary-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+            tab === 'answers' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
           }`}
         >
           Answers ({user.answerCount || 0})
         </button>
+        {isOwnProfile && (
+          <button
+            onClick={() => setTab('saved')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              tab === 'saved' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+            }`}
+          >
+            Saved
+          </button>
+        )}
       </div>
 
       {tab === 'questions' ? (
         questions.length === 0 ? (
-          <div className="card p-8 text-center text-gray-500">No questions yet</div>
+          <div className="card p-8 text-center text-[var(--color-text-secondary)]">No questions yet</div>
         ) : (
           <div className="space-y-4">
             {questions.map(q => <QuestionCard key={q._id} question={q} />)}
           </div>
         )
-      ) : (
+      ) : tab === 'answers' ? (
         answers.length === 0 ? (
-          <div className="card p-8 text-center text-gray-500">No answers yet</div>
+          <div className="card p-8 text-center text-[var(--color-text-secondary)]">No answers yet</div>
         ) : (
           <div className="space-y-4">
             {answers.map(answer => (
               <Link key={answer._id} href={`/questions/${answer.question?._id || answer.question}`} className="card-hover p-4 block">
                 <div className="flex items-center gap-2 mb-2">
                   {answer.isAccepted && <span className="badge-green text-xs">Accepted</span>}
-                  <span className="text-xs text-gray-500">{answer.upvotes || 0} votes</span>
+                  <span className="text-xs text-[var(--color-text-secondary)]">{answer.upvotes || 0} votes</span>
                 </div>
-                <p className="text-sm text-gray-700 line-clamp-3">{answer.body?.slice(0, 300)}</p>
-                <p className="text-xs text-gray-500 mt-2">Answered {formatDate(answer.createdAt)}</p>
+                <p className="text-sm text-[var(--color-text-secondary)] line-clamp-3">{answer.body?.slice(0, 300)}</p>
+                <p className="text-xs text-[var(--color-text-secondary)] mt-2">Answered {formatDate(answer.createdAt)}</p>
               </Link>
             ))}
           </div>
         )
+      ) : (
+        <div>
+          {isOwnProfile && (
+            <div className="flex gap-1 mb-4 border-b border-[var(--color-border)]">
+              <button
+                onClick={() => setSavedSubTab('questions')}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  savedSubTab === 'questions' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                Questions
+              </button>
+              <button
+                onClick={() => setSavedSubTab('faqs')}
+                className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
+                  savedSubTab === 'faqs' ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+                }`}
+              >
+                FAQs
+              </button>
+            </div>
+          )}
+          {savedSubTab === 'questions' ? (
+            savedQuestions.length === 0 ? (
+              <div className="card p-8 text-center text-[var(--color-text-secondary)]">No saved questions yet</div>
+            ) : (
+              <div className="space-y-4">
+                {savedQuestions.map(item => (
+                  <QuestionCard key={item._id} question={item.question} />
+                ))}
+              </div>
+            )
+          ) : (
+            savedFaqs.length === 0 ? (
+              <div className="card p-8 text-center text-[var(--color-text-secondary)]">No saved FAQs yet</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {savedFaqs.map(item => (
+                  <FAQCard key={item._id} faq={item.faq} />
+                ))}
+              </div>
+            )
+          )}
+        </div>
       )}
     </div>
   );

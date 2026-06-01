@@ -11,7 +11,7 @@ const connectDB = require('./config/db');
 const { errorHandler } = require('./middleware/errorHandler');
 const { apiLimiter } = require('./middleware/rateLimiter');
 const { setupSocket } = require('./socket');
-const { initIndices } = require('./services/searchService');
+const { initIndices, syncToElasticsearch, seedDatabase } = require('./services/searchService');
 
 // Ensure uploads directory
 const uploadsDir = path.join(__dirname, 'uploads');
@@ -28,6 +28,8 @@ const userRoutes = require('./routes/users');
 const tagRoutes = require('./routes/tags');
 const notificationRoutes = require('./routes/notifications');
 const adminRoutes = require('./routes/admin');
+const recommendationRoutes = require('./routes/recommendations');
+const categoryRoutes = require('./routes/categories');
 
 const app = express();
 const server = http.createServer(app);
@@ -60,6 +62,8 @@ app.use('/api/users', userRoutes);
 app.use('/api/tags', tagRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/recommendations', recommendationRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // 404 handler
 app.use((req, res) => {
@@ -73,11 +77,12 @@ app.use(errorHandler);
 const startServer = async () => {
   await connectDB();
 
-  // Initialize search indices (non-blocking)
   try {
+    await seedDatabase();
     await initIndices();
+    await syncToElasticsearch();
   } catch (err) {
-    console.log('Search index init skipped:', err.message);
+    console.log('Startup init skipped:', err.message);
   }
 
   server.listen(config.port, () => {
