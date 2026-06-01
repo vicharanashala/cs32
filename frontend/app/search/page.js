@@ -5,6 +5,21 @@ import Link from 'next/link';
 import { formatDate, truncate } from '@/lib/utils';
 import api from '@/lib/api';
 
+const getSearchResultLink = (result) => {
+  const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');
+  if (typeLabel === 'question') {
+    return `/questions/${result.id}`;
+  } else if (typeLabel === 'faq') {
+    if (result.id && result.id.includes('_')) {
+      const [faqId, itemId] = result.id.split('_');
+      return `/faqs/${result.slug || faqId}#${itemId}`;
+    }
+    return `/faqs/${result.slug || result.faqId || result.id}`;
+  } else {
+    return `/users/${result.username}`;
+  }
+};
+
 function SearchPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -161,7 +176,7 @@ function SearchPageContent() {
               const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');
               const title = result.title || result.question || result.faqTitle || result.displayName || result.username || 'Untitled';
               const desc = result.body || result.description || result.answer || result.bio || '';
-              const link = typeLabel === 'question' ? `/questions/${result.id}` : typeLabel === 'faq' ? `/faqs/${result.faqId || result.slug || result.id}` : `/users/${result.username}`;
+              const link = getSearchResultLink(result);
 
               return (
                 <Link key={result.id} href={link} className="bg-[var(--color-bg-secondary)]/80 backdrop-blur-md border border-[var(--color-border)]/60 rounded-2xl p-5 block transition-all duration-300 hover:shadow-lg hover:border-[var(--color-primary)]/30 hover:-translate-y-0.5">
