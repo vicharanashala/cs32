@@ -191,7 +191,7 @@ exports.deleteFAQItem = async (req, res, next) => {
 
 exports.markFAQHelpful = async (req, res, next) => {
   try {
-    const { helpful } = req.body;
+    const { helpful, undo } = req.body;
     const faq = await FAQ.findById(req.params.id);
     if (!faq) throw new AppError('FAQ not found', 404);
 
@@ -201,9 +201,20 @@ exports.markFAQHelpful = async (req, res, next) => {
     const userId = req.user._id;
     const existingFeedback = item.userFeedback.find(f => f.user.toString() === userId.toString());
 
+    if (undo && existingFeedback) {
+      if (existingFeedback.helpful) {
+        item.helpfulCount = Math.max(0, item.helpfulCount - 1);
+      } else {
+        item.notHelpfulCount = Math.max(0, item.notHelpfulCount - 1);
+      }
+      item.userFeedback = item.userFeedback.filter(f => f.user.toString() !== userId.toString());
+      await faq.save();
+      return res.json({ message: 'Vote removed', helpfulCount: item.helpfulCount, notHelpfulCount: item.notHelpfulCount, voted: null });
+    }
+
     if (existingFeedback) {
       if (existingFeedback.helpful === helpful) {
-        return res.status(400).json({ message: 'You have already voted on this item' });
+        return res.status(400).json({ message: 'You have already voted on this item', voted: helpful ? 'helpful' : 'notHelpful' });
       }
       if (existingFeedback.helpful) {
         item.helpfulCount -= 1;
@@ -221,7 +232,7 @@ exports.markFAQHelpful = async (req, res, next) => {
     }
 
     await faq.save();
-    res.json({ message: 'Feedback recorded', helpfulCount: item.helpfulCount, notHelpfulCount: item.notHelpfulCount });
+    res.json({ message: 'Feedback recorded', helpfulCount: item.helpfulCount, notHelpfulCount: item.notHelpfulCount, voted: helpful ? 'helpful' : 'notHelpful' });
   } catch (err) {
     next(err);
   }

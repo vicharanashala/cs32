@@ -79,13 +79,20 @@ export default function HomePage() {
   const handleFeedback = async (faqId, itemId, helpful) => {
     if (!user) { toast.error('Please login to vote'); return; }
     const currentVote = localVotes[itemId];
-    if (currentVote === (helpful ? 'helpful' : 'notHelpful')) {
-      toast.error('You have already voted');
-      return;
-    }
+    const isUndo = currentVote === (helpful ? 'helpful' : 'notHelpful');
     try {
-      const data = await api.post(`/faqs/${faqId}/items/${itemId}/feedback`, { helpful });
-      setLocalVotes(prev => ({ ...prev, [itemId]: helpful ? 'helpful' : 'notHelpful' }));
+      const data = await api.post(`/faqs/${faqId}/items/${itemId}/feedback`, { helpful, undo: isUndo });
+      if (data.voted === null) {
+        setLocalVotes(prev => {
+          const next = { ...prev };
+          delete next[itemId];
+          return next;
+        });
+        toast.success('Vote removed');
+      } else {
+        setLocalVotes(prev => ({ ...prev, [itemId]: data.voted }));
+        toast.success(helpful ? 'Glad this helped!' : 'Thanks for the feedback');
+      }
       setFaqs(prev => prev.map(faq => {
         if (faq._id !== faqId) return faq;
         return {
@@ -96,7 +103,6 @@ export default function HomePage() {
           })
         };
       }));
-      toast.success(helpful ? 'Glad this helped!' : 'Thanks for the feedback');
     } catch (err) {
       toast.error(err.message);
     }
