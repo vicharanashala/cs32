@@ -65,15 +65,33 @@ export default function OnboardingModal() {
 
   useEffect(() => {
     if (!user || loading) return;
-    if (user.hasCompletedOnboarding) return;
     if (user.role === 'admin' || user.role === 'moderator') return;
-    setIsOpen(true);
+
+    // Prevent repeated popups if user dismissed the prompt in current session
+    if (typeof window !== 'undefined' && sessionStorage.getItem('phase_prompt_dismissed')) {
+      return;
+    }
+
+    const needsOnboarding = !user.hasCompletedOnboarding;
+    const needsPhaseSelection = !user.currentPhase;
+
+    if (needsOnboarding) {
+      setStep(0);
+      setIsOpen(true);
+    } else if (needsPhaseSelection) {
+      // Existing user who hasn't selected a phase -> jump directly to phase selection step
+      setStep(STEPS.length - 1);
+      setIsOpen(true);
+    }
   }, [user, loading]);
 
   const handleDismiss = async (phaseValue = null) => {
     try {
       await completeOnboarding(phaseValue);
     } catch (_) {}
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('phase_prompt_dismissed', 'true');
+    }
     setDismissed(true);
     setIsOpen(false);
   };
@@ -93,6 +111,9 @@ export default function OnboardingModal() {
   };
 
   const handleSkip = () => {
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('phase_prompt_dismissed', 'true');
+    }
     handleDismiss(null);
   };
 
