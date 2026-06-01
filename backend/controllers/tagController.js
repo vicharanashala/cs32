@@ -10,6 +10,12 @@ exports.getTags = async (req, res, next) => {
     }
     if (req.query.category) filter.category = req.query.category;
 
+    // Ensure we only retrieve official tags or tags associated with at least one question
+    filter.$or = [
+      { isOfficial: true },
+      { questionCount: { $gt: 0 } }
+    ];
+
     const tags = await Tag.find(filter)
       .sort({ questionCount: -1 })
       .limit(100);

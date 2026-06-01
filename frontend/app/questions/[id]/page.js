@@ -98,7 +98,11 @@ export default function QuestionDetailPage() {
   }, [socket, id]);
 
   const handleVote = async (targetType, targetId, voteType, reasonData = null) => {
-    if (!user) { toast.error('Please login to vote'); return; }
+    if (!user) {
+      toast.error('Please login to vote');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       const payload = { targetType, targetId, voteType };
       if (voteType === 'downvote' && reasonData) {
@@ -117,6 +121,11 @@ export default function QuestionDetailPage() {
   };
 
   const openDownvoteModal = (targetType, targetId) => {
+    if (!user) {
+      toast.error('Please login to vote');
+      router.push('/auth?mode=login');
+      return;
+    }
     setShowDownvoteModal({ open: true, targetType, targetId });
   };
 
@@ -126,7 +135,11 @@ export default function QuestionDetailPage() {
   };
 
   const handleSave = async () => {
-    if (!user) { toast.error('Please login to save'); return; }
+    if (!user) {
+      toast.error('Please login to save');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       if (saved) {
         await api.delete(`/users/me/saved/${id}`);
@@ -153,7 +166,11 @@ export default function QuestionDetailPage() {
   };
 
   const handleMeToo = async () => {
-    if (!user) { toast.error('Please login to use this feature'); return; }
+    if (!user) {
+      toast.error('Please login to use this feature');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       const data = await api.patch(`/questions/${id}/me-too`);
       setQuestion(prev => prev ? { ...prev, meTooCount: data.meTooCount, hasMeToo: data.hasMeToo } : prev);
@@ -164,7 +181,11 @@ export default function QuestionDetailPage() {
   };
 
   const handleSolvedMyDoubt = async (answerId) => {
-    if (!user) { toast.error('Please login to use this feature'); return; }
+    if (!user) {
+      toast.error('Please login to use this feature');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       const data = await api.patch(`/answers/${answerId}/solved-my-doubt`);
       setSolvedDoubtAnswers(prev => ({
@@ -181,7 +202,11 @@ export default function QuestionDetailPage() {
 
   const handleSubmitAnswer = async (e) => {
     e.preventDefault();
-    if (!user) { toast.error('Please login to answer'); return; }
+    if (!user) {
+      toast.error('Please login to answer');
+      router.push('/auth?mode=login');
+      return;
+    }
     if (newAnswer.length < 10) { toast.error('Answer too short'); return; }
 
     setAnswering(true);
