@@ -49,6 +49,33 @@ export default function FAQDetailPage() {
     checkIfSaved();
   }, [user, faq]);
 
+  useEffect(() => {
+    const handleHashChange = () => {
+      if (typeof window !== 'undefined' && window.location.hash && faq) {
+        const hashId = window.location.hash.substring(1);
+        const index = faq.items.findIndex(item => item._id === hashId);
+        if (index !== -1) {
+          setActiveItem(index);
+          setTimeout(() => {
+            const element = document.getElementById(hashId);
+            if (element) {
+              element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          }, 100);
+        }
+      }
+    };
+
+    window.addEventListener('hashchange', handleHashChange);
+    if (faq) {
+      handleHashChange();
+    }
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashChange);
+    };
+  }, [faq]);
+
   const isAdminOrMod = user && (user.role === 'admin' || user.role === 'moderator');
 
   const handleAddQuestion = async (e) => {
@@ -176,7 +203,7 @@ export default function FAQDetailPage() {
                 key={item._id}
                 onClick={() => {
                   setActiveItem(index);
-                  document.getElementById(`item-${index}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  document.getElementById(item._id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }}
                 className={`block w-full text-left px-3 py-1.5 text-sm rounded-lg transition-colors ${
                   activeItem === index ? 'bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 font-medium' : 'text-[var(--color-text-secondary)] hover:bg-gray-50 dark:hover:bg-gray-700'
@@ -194,8 +221,9 @@ export default function FAQDetailPage() {
         {(faq.items || []).filter(i => i.isPublished).map((item, index) => (
           <div
             key={item._id}
-            id={`item-${index}`}
-            className={`card p-6 transition-all ${activeItem === index ? 'ring-2 ring-primary-200' : ''}`}
+            id={item._id}
+            style={{ scrollMarginTop: '100px' }}
+            className={`card p-6 transition-all ${activeItem === index ? 'ring-2 ring-[var(--color-primary)]' : ''}`}
           >
             <h2 className="text-lg font-semibold text-[var(--color-text)] mb-3">{item.question}</h2>
             <MarkdownRenderer content={item.answer} />
