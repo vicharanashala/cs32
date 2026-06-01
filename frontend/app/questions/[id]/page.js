@@ -214,6 +214,17 @@ export default function QuestionDetailPage() {
     }
   };
 
+  const handleDeleteAnswer = async (answerId) => {
+    if (!confirm('Are you sure you want to delete this answer?')) return;
+    try {
+      await api.delete(`/answers/${answerId}`);
+      toast.success('Answer deleted');
+      fetchAnswers();
+    } catch (err) {
+      toast.error(err.message);
+    }
+  };
+
   const handleEscalate = async () => {
     try {
       await api.patch(`/questions/${id}/escalate`, { reason: escalationReason });
@@ -609,6 +620,11 @@ export default function QuestionDetailPage() {
                           {(user?.role === 'admin' || user?.role === 'moderator') && (
                             <button onClick={() => openAddToFAQModal(answer._id)} className="btn-secondary btn-sm">
                               Add to FAQ
+                            </button>
+                          )}
+                          {user && (user?.role === 'admin' || user?.role === 'moderator' || user?.id === answer.author?._id) && (
+                            <button onClick={() => handleDeleteAnswer(answer._id)} className="btn-danger btn-sm">
+                              Delete
                             </button>
                           )}
                         </div>
