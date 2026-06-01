@@ -122,7 +122,7 @@ function SearchPageContent() {
           ))}
         </div>
       ) : results.length === 0 && searchParams.get('q') ? (
-        <div className="bg-[var(--color-bg-secondary)]/80 backdrop-blur-md border border-[var(--color-border)]/60 rounded-2xl p-12 text-center">
+        <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-12 text-center">
           <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--color-bg-tertiary)] flex items-center justify-center">
             <svg className="w-8 h-8 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />

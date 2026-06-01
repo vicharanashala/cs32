@@ -239,6 +239,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
             type: 'best_fields',
             fuzziness: 'AUTO',
             minimum_should_match: '2<70%',
+            analyzer: 'english',
           },
         });
       } else if (type === 'questions') {
@@ -249,6 +250,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
             type: 'best_fields',
             fuzziness: 'AUTO',
             minimum_should_match: '2<70%',
+            analyzer: 'english',
           },
         });
       } else if (type === 'faqs') {
@@ -259,6 +261,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
             type: 'best_fields',
             fuzziness: 'AUTO',
             minimum_should_match: '2<70%',
+            analyzer: 'english',
           },
         });
       } else {
@@ -270,6 +273,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
             type: 'best_fields',
             fuzziness: 'AUTO',
             minimum_should_match: '2<70%',
+            analyzer: 'english',
           },
         });
       }
