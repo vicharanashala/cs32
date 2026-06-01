@@ -391,7 +391,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
       const title = h._source.title || h._source.question || h._source.faqTitle || h._source.displayName || h._source.username || '';
       const exact = doesMatchExactly(query, title);
       
-      let normScore = exact ? 1.0 : (maxScore > 0 ? (h._score / maxScore) : 1.0);
+      let normScore = exact ? 1.0 : (maxScore > 0 ? (h._score / maxScore) * 0.95 : 0.95);
       if (normScore > 1.0) normScore = 1.0;
       if (normScore < 0.1) normScore = 0.1;
 
@@ -636,51 +636,41 @@ const syncToElasticsearch = async () => {
     const FAQ = require('../models/FAQ');
     const User = require('../models/User');
 
-    // Check if ES indices are empty while MongoDB has data
-    const [qCount, fCount, uCount] = await Promise.all([
-      es.count({ index: INDEX_QUESTIONS }).then(r => r.count).catch(() => 0),
-      es.count({ index: INDEX_FAQS }).then(r => r.count).catch(() => 0),
-      es.count({ index: INDEX_USERS }).then(r => r.count).catch(() => 0),
-    ]);
-
-    const [mongoQuestions, mongoFaqs, mongoUsers] = await Promise.all([
-      Question.countDocuments({ isDeleted: false }),
-      FAQ.countDocuments(),
-      User.countDocuments(),
-    ]);
-
-    if (qCount === 0 && mongoQuestions > 0) {
-      console.log(`Syncing ${mongoQuestions} questions to Elasticsearch...`);
-      const questions = await Question.find({ isDeleted: false })
-        .populate('author', 'username displayName avatar reputation')
-        .populate('tags', 'name color');
-      for (const q of questions) {
-        await indexQuestion(q);
+    console.log('Clearing and recreating Elasticsearch indices to ensure full sync...');
+    for (const index of [INDEX_QUESTIONS, INDEX_FAQS, INDEX_FAQ_ITEMS, INDEX_USERS]) {
+      try {
+        const exists = await es.indices.exists({ index });
+        if (exists) {
+          await es.indices.delete({ index });
+        }
+      } catch (err) {
+        console.error(`Error deleting index ${index}:`, err.message);
       }
-      console.log(`Synced ${questions.length} questions`);
     }
 
-    if (fCount === 0 && mongoFaqs > 0) {
-      console.log(`Syncing ${mongoFaqs} FAQs to Elasticsearch...`);
-      const faqs = await FAQ.find();
-      for (const faq of faqs) {
-        await indexFAQ(faq);
-      }
-      console.log(`Synced ${faqs.length} FAQs with items`);
+    await initIndices();
+
+    const questions = await Question.find({ isDeleted: false })
+      .populate('author', 'username displayName avatar reputation')
+      .populate('tags', 'name color');
+    console.log(`Syncing ${questions.length} questions to Elasticsearch...`);
+    for (const q of questions) {
+      await indexQuestion(q);
     }
 
-    if (uCount !== mongoUsers) {
-      console.log(`Syncing ${mongoUsers} users to Elasticsearch...`);
-      const users = await User.find();
-      for (const u of users) {
-        await indexUser(u);
-      }
-      console.log(`Synced ${users.length} users`);
+    const faqs = await FAQ.find();
+    console.log(`Syncing ${faqs.length} FAQs to Elasticsearch...`);
+    for (const faq of faqs) {
+      await indexFAQ(faq);
     }
 
-    if (qCount > 0 && fCount > 0 && uCount > 0) {
-      console.log('Elasticsearch already in sync');
+    const users = await User.find();
+    console.log(`Syncing ${users.length} users to Elasticsearch...`);
+    for (const u of users) {
+      await indexUser(u);
     }
+
+    console.log('Elasticsearch index synchronization complete!');
   } catch (err) {
     console.error('ES sync error:', err.message);
   }
