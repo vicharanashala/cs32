@@ -18,35 +18,61 @@ const STEPS = [
     title: 'Browse FAQs first',
     description: 'Many common questions are already answered in our FAQ section. Check if yours is there before asking.',
     action: { label: 'Go to FAQs', href: '/faqs' },
+    icon: (
+      <svg className="w-12 h-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.232.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+      </svg>
+    ),
   },
   {
     title: 'Search before asking',
     description: 'Your doubt might already be solved. Use the search bar to find existing questions and answers.',
     hint: 'Press / or Ctrl+K to open search',
+    icon: (
+      <svg className="w-12 h-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+      </svg>
+    ),
   },
   {
     title: 'Ask your first question',
-    description: "Couldn\'t find your answer? Go ahead and ask! You can post anonymously if you prefer.",
+    description: "Couldn't find your answer? Go ahead and ask! You can post anonymously if you prefer.",
     action: { label: 'Ask a Question', href: '/questions/ask' },
+    icon: (
+      <svg className="w-12 h-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    ),
+  },
+  {
+    title: 'Select your current phase',
+    description: 'This helps us personalize FAQ recommendations to guide your current learning journey.',
+    isPhaseSelection: true,
+    icon: (
+      <svg className="w-12 h-12 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+      </svg>
+    ),
   },
 ];
 
 export default function OnboardingModal() {
-  const { user, loading } = useAuth();
+  const { user, loading, completeOnboarding } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [step, setStep] = useState(0);
   const [dismissed, setDismissed] = useState(false);
+  const [selectedPhase, setSelectedPhase] = useState('pre');
 
-useEffect(() => {
+  useEffect(() => {
     if (!user || loading) return;
     if (user.hasCompletedOnboarding) return;
     if (user.role === 'admin' || user.role === 'moderator') return;
     setIsOpen(true);
   }, [user, loading]);
 
-  const handleDismiss = async () => {
+  const handleDismiss = async (phaseValue = null) => {
     try {
-      await api.patch('/users/me/onboarding');
+      await completeOnboarding(phaseValue);
     } catch (_) {}
     setDismissed(true);
     setIsOpen(false);
@@ -56,7 +82,7 @@ useEffect(() => {
     if (step < STEPS.length - 1) {
       setStep(step + 1);
     } else {
-      handleDismiss();
+      handleDismiss(selectedPhase);
     }
   };
 
@@ -67,7 +93,7 @@ useEffect(() => {
   };
 
   const handleSkip = () => {
-    handleDismiss();
+    handleDismiss(null);
   };
 
   if (!isOpen || dismissed) return null;
@@ -79,25 +105,56 @@ useEffect(() => {
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div className="fixed inset-0 bg-black/50" onClick={handleSkip} />
       <div className="relative bg-[var(--color-bg-secondary)] rounded-2xl shadow-2xl w-full max-w-md mx-4 overflow-hidden">
-        <div className="p-8 text-center">
+        <div className="p-8 text-center max-h-[85vh] overflow-y-auto">
           <div className="flex justify-center mb-6">{current.icon}</div>
           <h2 className="text-xl font-bold text-[var(--color-text)] mb-2">{current.title}</h2>
           <p className="text-[var(--color-text-secondary)] text-sm leading-relaxed mb-6">{current.description}</p>
 
-          {current.hint && (
-            <div className="mb-6 px-4 py-2 bg-[var(--color-bg)] rounded-lg border border-[var(--color-border)]">
-              <p className="text-xs text-[var(--color-text-secondary)]">{current.hint}</p>
+          {current.isPhaseSelection ? (
+            <div className="flex flex-col gap-2.5 mb-6 text-left">
+              {[
+                { id: 'pre', name: 'Pre-Internship', desc: 'Getting Started & ViBe Platform' },
+                { id: 'phase1_coursework', name: 'Phase 1 - Coursework', desc: 'Vibe LMS & Live sessions' },
+                { id: 'phase1_completed', name: 'Phase 1 Completed', desc: 'Team Formation & Yaksha Chat' },
+                { id: 'phase2_project', name: 'Phase 2 - Project', desc: 'Interviews & Certificate' },
+                { id: 'completed', name: 'Completed / Alumni', desc: 'Certificate & Alumni network' }
+              ].map((p) => {
+                const isSel = selectedPhase === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedPhase(p.id)}
+                    className={`w-full p-3 rounded-xl border text-left transition-all ${
+                      isSel
+                        ? 'border-[var(--color-primary)] bg-[var(--color-primary)]/5 text-[var(--color-text)] font-semibold shadow-sm'
+                        : 'border-[var(--color-border)]/60 text-[var(--color-text-secondary)] hover:border-[var(--color-primary)]/30 hover:bg-[var(--color-bg-tertiary)]/50'
+                    }`}
+                  >
+                    <div className="text-sm font-semibold">{p.name}</div>
+                    <div className="text-xs text-[var(--color-text-muted)] mt-0.5">{p.desc}</div>
+                  </button>
+                );
+              })}
             </div>
-          )}
+          ) : (
+            <>
+              {current.hint && (
+                <div className="mb-6 px-4 py-2 bg-[var(--color-bg)] rounded-lg border border-[var(--color-border)]">
+                  <p className="text-xs text-[var(--color-text-secondary)]">{current.hint}</p>
+                </div>
+              )}
 
-          {current.action && (
-            <Link
-              href={current.action.href}
-              className="inline-block mb-6 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
-              onClick={handleDismiss}
-            >
-              {current.action.label}
-            </Link>
+              {current.action && (
+                <Link
+                  href={current.action.href}
+                  className="inline-block mb-6 px-4 py-2 bg-primary-600 text-white rounded-lg text-sm font-medium hover:bg-primary-700 transition-colors"
+                  onClick={() => handleDismiss(null)}
+                >
+                  {current.action.label}
+                </Link>
+              )}
+            </>
           )}
         </div>
 

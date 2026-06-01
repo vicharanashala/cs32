@@ -60,8 +60,21 @@ export function AuthProvider({ children }) {
     return data;
   };
 
+  const completeOnboarding = async (currentPhase) => {
+    const data = await api.patch('/users/me/onboarding', { currentPhase });
+    if (data.user) {
+      setUser(data.user);
+    } else {
+      // Fallback: fetch user profile again
+      const meData = await api.get('/auth/me');
+      setUser(meData.user);
+    }
+    toast.success('Onboarding completed');
+    return data;
+  };
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, updateProfile, completeOnboarding }}>
       {children}
     </AuthContext.Provider>
   );
