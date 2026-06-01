@@ -69,7 +69,7 @@ function SearchPageContent() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search questions, FAQs, users..."
-            className="w-full px-4 py-3 pl-12 border border-[var(--color-border)]/60 rounded-xl text-sm bg-[var(--color-bg-secondary)]/80 backdrop-blur-md text-[var(--color-text)] placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)] transition-all"
+            className="w-full px-4 py-3 pl-12 border border-[var(--color-border)]/60 rounded-xl text-sm bg-[var(--color-bg-secondary)]/80 backdrop-blur-md text-[var(--color-text)] dark:text-white placeholder:text-[var(--color-text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]/30 focus:border-[var(--color-primary)] transition-all"
             autoFocus
           />
           <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--color-text-muted)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -129,16 +129,29 @@ function SearchPageContent() {
             </svg>
           </div>
           <h3 className="text-lg font-bold text-[var(--color-text)] mb-2">No results found for "{searchParams.get('q')}"</h3>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-6">Try different keywords or browse categories</p>
-          <Link
-            href={`/questions/ask?title=${encodeURIComponent(searchParams.get('q') || '')}`}
-            className="inline-flex items-center gap-2 px-5 py-2.5 text-sm font-semibold bg-[var(--color-primary)] text-white rounded-xl hover:opacity-90 transition-opacity"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            Create new question
-          </Link>
+          <p className="text-sm text-[var(--color-text-secondary)] mb-8">It seems this question or topic is new to the platform.</p>
+          
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+            <Link
+              href={`/questions/ask?title=${encodeURIComponent(searchParams.get('q') || '')}`}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold bg-[var(--color-primary)] text-white rounded-xl hover:opacity-90 shadow-md shadow-[var(--color-primary)]/10 hover:shadow-lg transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Do you want to ask a question?
+            </Link>
+            <span className="text-xs font-semibold uppercase tracking-wider text-[var(--color-text-muted)]">or</span>
+            <Link
+              href={`/faqs?add=true`}
+              className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-3 text-sm font-semibold bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] text-[var(--color-text)] rounded-xl hover:bg-[var(--color-bg-secondary)] hover:border-[var(--color-primary)]/30 transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+              </svg>
+              Create a new FAQ?
+            </Link>
+          </div>
         </div>
       ) : (
         <>
