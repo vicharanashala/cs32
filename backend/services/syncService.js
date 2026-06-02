@@ -1,3 +1,4 @@
+const admin = require('firebase-admin');
 const User = require('../models/User');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
@@ -5,13 +6,45 @@ const Answer = require('../models/Answer');
 let lastSyncTime = 0;
 const SYNC_INTERVAL = 30000; // 30 seconds cooldown
 
+let firebaseAdminApp = null;
+
+const getFirebaseAdmin = () => {
+  if (firebaseAdminApp) return firebaseAdminApp;
+
+  const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!serviceAccountEnv) {
+    return null;
+  }
+
+  try {
+    let serviceAccount;
+    const trimmed = serviceAccountEnv.trim();
+    if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+      serviceAccount = JSON.parse(trimmed);
+    } else {
+      serviceAccount = require(trimmed);
+    }
+
+    firebaseAdminApp = admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount)
+    }, 'sync-app');
+    return firebaseAdminApp;
+  } catch (err) {
+    console.error('⚠️ Failed to initialize Firebase Admin SDK:', err.message);
+    return null;
+  }
+};
+
 const syncGoogleUsers = async () => {
   const now = Date.now();
   if (now - lastSyncTime < SYNC_INTERVAL) return;
   lastSyncTime = now;
 
-  const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
-  if (!apiKey) return;
+  const app = getFirebaseAdmin();
+  if (!app) {
+    console.log('⚠️ FIREBASE_SERVICE_ACCOUNT not configured in secrets.env. Automated Firebase user pruning is inactive.');
+    return;
+  }
 
   try {
     const googleUsers = await User.find({ googleId: { $exists: true, $ne: null } });
@@ -21,41 +54,36 @@ const syncGoogleUsers = async () => {
     const realGoogleUsers = googleUsers.filter(u => u.googleId && !u.googleId.startsWith('mock_google_id_'));
     if (realGoogleUsers.length === 0) return;
 
-    const uids = realGoogleUsers.map(u => u.googleId);
-
-    // Query in chunks of 100
-    const chunkSize = 100;
-    for (let i = 0; i < uids.length; i += chunkSize) {
-      const chunk = uids.slice(i, i + chunkSize);
-
-      const response = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ localId: chunk })
+    // Fetch all active Firebase users
+    const auth = app.auth();
+    const activeFirebaseUids = new Set();
+    
+    let nextPageToken;
+    do {
+      const listUsersResult = await auth.listUsers(1000, nextPageToken);
+      listUsersResult.users.forEach((userRecord) => {
+        activeFirebaseUids.add(userRecord.uid);
+        // Also add provider UIDs if any (e.g. googleId might match userRecord.providerData[0].uid)
+        userRecord.providerData.forEach((profile) => {
+          if (profile.uid) {
+            activeFirebaseUids.add(profile.uid);
+          }
+        });
       });
+      nextPageToken = listUsersResult.pageToken;
+    } while (nextPageToken);
 
-      if (!response.ok) {
-        console.error('Firebase accounts lookup failed during sync:', response.statusText);
-        continue;
-      }
-
-      const data = await response.json();
-      const existingUids = new Set((data.users || []).map(u => u.localId));
-
-      const deletedUids = chunk.filter(uid => !existingUids.has(uid));
-
-      for (const deletedUid of deletedUids) {
-        const targetUser = realGoogleUsers.find(u => u.googleId === deletedUid);
-        if (targetUser) {
-          console.log(`[Sync] Deleting user ${targetUser.username} (${targetUser.email}) because they were removed from Google Auth.`);
-          
-          // Delete their questions, answers, and user record
-          await Promise.all([
-            Question.deleteMany({ author: targetUser._id }),
-            Answer.deleteMany({ author: targetUser._id }),
-            User.deleteOne({ _id: targetUser._id })
-          ]);
-        }
+    // Any MongoDB user whose googleId is NOT in activeFirebaseUids has been removed from Firebase Auth!
+    for (const targetUser of realGoogleUsers) {
+      if (!activeFirebaseUids.has(targetUser.googleId)) {
+        console.log(`[Sync] Deleting user ${targetUser.username} (${targetUser.email}) because they were removed from Firebase Auth.`);
+        
+        // Delete their questions, answers, and user record
+        await Promise.all([
+          Question.deleteMany({ author: targetUser._id }),
+          Answer.deleteMany({ author: targetUser._id }),
+          User.deleteOne({ _id: targetUser._id })
+        ]);
       }
     }
   } catch (err) {
