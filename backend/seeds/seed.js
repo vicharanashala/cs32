@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../secrets.env') });
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
