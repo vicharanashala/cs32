@@ -91,7 +91,7 @@ export default function Navbar({ onSearch }) {
                   >
                     {user.avatar || user.avatarUrl ? (
                       <img
-                        src={user.avatar ? (user.avatar.startsWith('http') ? user.avatar : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '')}${user.avatar}`) : user.avatarUrl}
+                        src={user.avatar ? ((user.avatar.startsWith('http') || user.avatar.startsWith('data:')) ? user.avatar : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '')}${user.avatar}`) : user.avatarUrl}
                         alt={user.displayName || user.username}
                         className="w-8 h-8 rounded-xl object-cover shadow-md border border-[var(--color-border)]/40"
                         onError={(e) => {

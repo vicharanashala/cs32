@@ -94,12 +94,16 @@ exports.vote = async (req, res, next) => {
     }
 
     if (voteType === 'upvote' && target.author.toString() !== req.user._id.toString()) {
+      const linkUrl = targetType === 'Question'
+        ? `/questions/${targetId}`
+        : `/questions/${target.question.toString()}#answer-${target._id.toString()}`;
+
       await Notification.create({
         recipient: target.author,
         type: 'upvote',
         title: 'You received an upvote',
         message: `Your ${targetType.toLowerCase()} received an upvote`,
-        link: `/${targetType === 'Question' ? 'questions' : 'answers'}/${targetId}`,
+        link: linkUrl,
         referenceType: targetType,
         reference: targetId,
       });
@@ -115,6 +119,11 @@ exports.vote = async (req, res, next) => {
         spam: 'This is spam',
         other: 'See feedback below',
       };
+
+      const linkUrl = targetType === 'Question'
+        ? `/questions/${targetId}`
+        : `/questions/${target.question.toString()}#answer-${target._id.toString()}`;
+
       await Notification.create({
         recipient: target.author,
         type: 'downvote',
@@ -122,7 +131,7 @@ exports.vote = async (req, res, next) => {
         message: reasonText
           ? `${reasonLabels[reason] || 'Feedback'}: ${reasonText}`
           : `${reasonLabels[reason] || 'Feedback'}: A downvote was received`,
-        link: `/${targetType === 'Question' ? 'questions' : 'questions'}/${targetId}`,
+        link: linkUrl,
         referenceType: targetType,
         reference: targetId,
       });

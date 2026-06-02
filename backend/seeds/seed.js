@@ -6,6 +6,9 @@ const crypto = require('crypto');
 const config = require('../config');
 const User = require('../models/User');
 const FAQ = require('../models/FAQ');
+const Question = require('../models/Question');
+const Answer = require('../models/Answer');
+const Tag = require('../models/Tag');
 
 const slugify = (text) =>
   text
@@ -53,29 +56,49 @@ const seed = async () => {
           }
         }
       }
-//      if (!allValid) {
-//        console.error('Seed data integrity check failed. Aborting.');
-//        process.exit(1);
-//      }
     }
 
     const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
     const faqItems = JSON.parse(fs.readFileSync(faqsPath, 'utf-8'));
 
-    // Clear existing data
+    // Clean all mock questions, answers, tags, and FAQs
+    console.log('Cleaning mock database entries...');
     await Promise.all([
-      User.deleteMany({}),
       FAQ.deleteMany({}),
+      Question.deleteMany({}),
+      Answer.deleteMany({}),
+      Tag.deleteMany({}),
     ]);
 
-    // Seed admin user — credentials loaded from environment variables
-    await User.create({
-      username: process.env.ADMIN_USERNAME || 'admin',
-      email: process.env.ADMIN_EMAIL || 'admin@localhost.com',
-      password: process.env.ADMIN_PASSWORD || 'changeme123',
-      displayName: process.env.ADMIN_DISPLAY_NAME || 'Admin',
-      role: 'admin',
+    // Keep real users (who registered via normal signup or Google sign-in)
+    // We only delete users who are part of our previous mock users list or duplicate admins.
+    const mockUsernames = ['alex_rivera', 'priya_patel', 'kabir_singh', 'ananya_coder', 'shannu_dev', 'rohan_mehta'];
+    const adminUsername = process.env.ADMIN_USERNAME || 'prashnasarathi';
+
+    await User.deleteMany({
+      $or: [
+        { username: { $in: mockUsernames } },
+        { username: adminUsername }
+      ]
     });
+
+    // Check if admin user already exists, if not, create it
+    let admin = await User.findOne({ username: adminUsername });
+    if (!admin) {
+      admin = await User.create({
+        username: adminUsername,
+        email: process.env.ADMIN_EMAIL || 'faqportal.in@gmail.com',
+        password: process.env.ADMIN_PASSWORD || 'prashnasarathi123',
+        displayName: process.env.ADMIN_DISPLAY_NAME || 'Prashnasarathi',
+        role: 'admin',
+        reputation: 100,
+      });
+      console.log('Created clean Admin user:', adminUsername);
+    } else {
+      console.log('Admin user already exists, preserved.');
+    }
+
+    console.log('Seeding standard FAQ categories and items...');
 
     // Group FAQ items by categoryId
     const grouped = {};
@@ -112,10 +135,11 @@ const seed = async () => {
 
     await FAQ.insertMany(faqPages);
 
-    console.log('Seed data inserted successfully');
-    console.log(`Users: ${await User.countDocuments()}`);
+    console.log('Database cleaned and standard FAQs seeded successfully!');
+    console.log(`Remaining Users: ${await User.countDocuments()}`);
     console.log(`FAQs: ${await FAQ.countDocuments()}`);
-    console.log(`FAQ items: ${faqItems.length}`);
+    console.log(`Questions: ${await Question.countDocuments()}`);
+    console.log(`Answers: ${await Answer.countDocuments()}`);
 
     process.exit(0);
   } catch (error) {

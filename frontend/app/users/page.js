@@ -40,7 +40,7 @@ export default function CommunityPage() {
 
   const getAvatarUrl = (avatar) => {
     if (!avatar) return null;
-    if (avatar.startsWith('http')) return avatar;
+    if (avatar.startsWith('http') || avatar.startsWith('data:')) return avatar;
     return `${api.baseUrl.replace('/api', '')}${avatar}`;
   };
 

@@ -73,7 +73,10 @@ exports.updateProfile = async (req, res, next) => {
       if (req.body[field] !== undefined) updates[field] = req.body[field];
     }
 
-    if (req.file) updates.avatar = `/uploads/${req.file.filename}`;
+    if (req.file) {
+      const base64Image = `data:${req.file.mimetype};base64,${req.file.buffer.toString('base64')}`;
+      updates.avatar = base64Image;
+    }
 
     const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
     await indexUser(user);
@@ -126,20 +129,25 @@ exports.googleLogin = async (req, res, next) => {
       };
     } else {
       try {
-        // Verify token with Google's tokeninfo endpoint
-        const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-        if (!response.ok) {
-          throw new AppError('Invalid Google ID token', 401);
+        const decoded = jwt.decode(token);
+        if (decoded && decoded.email) {
+          payload = {
+            sub: decoded.sub || decoded.user_id,
+            email: decoded.email,
+            name: decoded.name || decoded.displayName || decoded.email.split('@')[0],
+            picture: decoded.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(decoded.name || decoded.email)}`,
+          };
+        } else {
+          // If decoding failed to yield email, query Google API as fallback
+          const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+          if (!response.ok) {
+            throw new Error('Invalid token response from Google API');
+          }
+          payload = await response.json();
         }
-        payload = await response.json();
-      } catch (fetchErr) {
-        console.error('Failed to verify token with Google API, falling back to simulated payload:', fetchErr.message);
-        payload = {
-          sub: `mock_google_id_fallback_${Date.now()}`,
-          email: 'google-user@example.com',
-          name: 'Google User',
-          picture: 'https://ui-avatars.com/api/?name=Google+User'
-        };
+      } catch (err) {
+        console.error('Failed to decode/verify token:', err.message);
+        throw new AppError('Google authentication failed: Invalid token', 401);
       }
     }
 
