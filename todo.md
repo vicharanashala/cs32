@@ -320,7 +320,19 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 2, 2026)
 
-1. **Persistent Onboarding Modal Popup**
+1. **Firebase Admin User Synchronization & Real-time Pruning**
+   * *Root Cause*: Public client-side Google Auth APIs could not securely verify if a user's account was deleted in Firebase console due to Firebase's default Email Enumeration Protection policies.
+   * *Resolution*: Integrated the **Firebase Admin SDK** on the backend (`syncService.js`). It retrieves the active list of project UIDs (including Google provider UIDs) and cascades deletion (removing user, questions, and answers) for any account removed from the Firebase Console.
+
+2. **Onboarding Welcome Email Simulation & Screen Preview**
+   * *Root Cause*: The user completed onboarding but could not verify welcome emails because SMTP credentials weren't set up yet in `secrets.env`.
+   * *Resolution*: Added an **Interactive Welcome Email Preview Modal** on the user's screen when onboarding is completed in mock/simulated SMTP mode. This renders the full HTML email newsletter with the user's selected phase, display name, and category.
+
+3. **Cascading User Deletion from Admin Panel**
+   * *Root Cause*: Admins needed a direct, manual way to permanently delete a user and purge their questions, answers, and statistics immediately.
+   * *Resolution*: Created the `DELETE /api/admin/users/:id` route/controller and integrated a **Delete** button directly in the Admin Panel's Users table in the frontend UI.
+
+4. **Persistent Onboarding Modal Popup**
    * *Root Cause*: Dismissing the onboarding phase prompt saved state only to `sessionStorage` (cleared on logout/tab close) and left `currentPhase` empty. If a user didn't choose a phase, they were prompted in every new session because `needsPhaseSelection` remained true.
    * *Resolution*: Converted onboarding dismissed/skipped state storage from `sessionStorage` to `localStorage` under `phase_prompt_dismissed_${user.id}`. Once dismissed or skipped, the user will never see the modal again across different logins.
 
