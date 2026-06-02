@@ -44,7 +44,7 @@ const createTransporter = () => {
 };
 
 const transporter = createTransporter();
-const SENDER_EMAIL = 'faqportal.in@gmail.com';
+const SENDER_EMAIL = process.env.SMTP_USER || 'faqportal.in@gmail.com';
 
 /**
  * Send email when a new user completes onboarding

@@ -128,26 +128,91 @@ exports.googleLogin = async (req, res, next) => {
         picture: `https://ui-avatars.com/api/?name=${email.split('@')[0]}`
       };
     } else {
-      try {
-        const decoded = jwt.decode(token);
-        if (decoded && decoded.email) {
-          payload = {
-            sub: decoded.sub || decoded.user_id,
-            email: decoded.email,
-            name: decoded.name || decoded.displayName || decoded.email.split('@')[0],
-            picture: decoded.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(decoded.name || decoded.email)}`,
-          };
-        } else {
-          // If decoding failed to yield email, query Google API as fallback
-          const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
-          if (!response.ok) {
-            throw new Error('Invalid token response from Google API');
+      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      if (apiKey) {
+        try {
+          const lookupResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken: token })
+          });
+          const data = await lookupResponse.json();
+          if (!lookupResponse.ok) {
+            const errMsg = data.error && data.error.message ? data.error.message : '';
+            console.error('Firebase accounts lookup returned error:', errMsg);
+            if (errMsg === 'USER_NOT_FOUND' || errMsg === 'USER_DISABLED') {
+              const decoded = jwt.decode(token);
+              if (decoded) {
+                const email = decoded.email;
+                const sub = decoded.sub || decoded.user_id;
+                if (email || sub) {
+                  console.log(`Deleting user from platform as they were removed from Google Auth: email=${email}, googleId=${sub}`);
+                  const Question = require('../models/Question');
+                  const Answer = require('../models/Answer');
+                  const targetUser = await User.findOne({ $or: [{ email }, { googleId: sub }] });
+                  if (targetUser) {
+                    await Promise.all([
+                      Question.deleteMany({ author: targetUser._id }),
+                      Answer.deleteMany({ author: targetUser._id }),
+                      User.deleteOne({ _id: targetUser._id })
+                    ]);
+                    console.log(`Successfully deleted user ${targetUser.username} and their posts from MongoDB.`);
+                  }
+                }
+              }
+              throw new AppError('Google authentication failed: User account has been removed/disabled', 401);
+            }
+            throw new Error(errMsg || 'Firebase verification failed');
           }
-          payload = await response.json();
+          if (data.users && data.users[0]) {
+            const firebaseUser = data.users[0];
+            payload = {
+              sub: firebaseUser.localId,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || firebaseUser.email.split('@')[0],
+              picture: firebaseUser.photoUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(firebaseUser.displayName || firebaseUser.email)}`,
+            };
+          } else {
+            throw new Error('No user data returned from Firebase accounts lookup');
+          }
+        } catch (err) {
+          console.error('Firebase token verification error:', err.message);
+          if (err instanceof AppError) {
+            throw err;
+          }
+          const decoded = jwt.decode(token);
+          if (decoded && decoded.email) {
+            payload = {
+              sub: decoded.sub || decoded.user_id,
+              email: decoded.email,
+              name: decoded.name || decoded.displayName || decoded.email.split('@')[0],
+              picture: decoded.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(decoded.name || decoded.email)}`,
+            };
+          } else {
+            throw new AppError('Google authentication failed: Invalid token', 401);
+          }
         }
-      } catch (err) {
-        console.error('Failed to decode/verify token:', err.message);
-        throw new AppError('Google authentication failed: Invalid token', 401);
+      } else {
+        try {
+          const decoded = jwt.decode(token);
+          if (decoded && decoded.email) {
+            payload = {
+              sub: decoded.sub || decoded.user_id,
+              email: decoded.email,
+              name: decoded.name || decoded.displayName || decoded.email.split('@')[0],
+              picture: decoded.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(decoded.name || decoded.email)}`,
+            };
+          } else {
+            const response = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${token}`);
+            if (!response.ok) {
+              throw new Error('Invalid token response from Google API');
+            }
+            payload = await response.json();
+          }
+        } catch (err) {
+          console.error('Failed to decode/verify token:', err.message);
+          throw new AppError('Google authentication failed: Invalid token', 401);
+        }
       }
     }
 
