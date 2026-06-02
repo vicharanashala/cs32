@@ -1,3 +1,4 @@
+require('dotenv').config();
 const mongoose = require('mongoose');
 const path = require('path');
 const fs = require('fs');
@@ -26,7 +27,7 @@ const seed = async () => {
       path.join(__dirname, '..', '..', '.integrity'),
       path.join(__dirname, '..', '..', '..', '.integrity'),
     ];
-    const integrityPath = integrityPaths.find(p => fs.existsSync(p));
+    const integrityPath = integrityPaths.find(p => fs.existsSync(p) && fs.statSync(p).isFile());
 
     // Verify integrity of seed data if checksum file exists
     if (fs.existsSync(integrityPath)) {
@@ -67,12 +68,12 @@ const seed = async () => {
       FAQ.deleteMany({}),
     ]);
 
-    // Seed admin user
+    // Seed admin user — credentials loaded from environment variables
     await User.create({
-      username: 'admin',
-      email: 'admin@quorafaq.com',
-      password: 'admin123',
-      displayName: 'Admin',
+      username: process.env.ADMIN_USERNAME || 'admin',
+      email: process.env.ADMIN_EMAIL || 'admin@localhost.com',
+      password: process.env.ADMIN_PASSWORD || 'changeme123',
+      displayName: process.env.ADMIN_DISPLAY_NAME || 'Admin',
       role: 'admin',
     });
 
