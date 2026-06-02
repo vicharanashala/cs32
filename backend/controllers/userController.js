@@ -131,10 +131,17 @@ exports.completeOnboarding = async (req, res, next) => {
     }
     const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
 
+    let emailPreview = null;
     // Trigger Onboarding welcome email via Nodemailer
     try {
       const { sendOnboardingEmail } = require('../services/emailService');
-      await sendOnboardingEmail(user);
+      const emailResult = await sendOnboardingEmail(user);
+      if (emailResult && emailResult.simulated) {
+        emailPreview = {
+          subject: emailResult.subject,
+          html: emailResult.html
+        };
+      }
     } catch (emailErr) {
       console.error('Email notification error:', emailErr.message);
     }
@@ -148,7 +155,7 @@ exports.completeOnboarding = async (req, res, next) => {
       console.error('Redis delete recommendation cache error:', redisErr.message);
     }
 
-    res.json({ message: 'Onboarding completed', user: user.toPublicJSON() });
+    res.json({ message: 'Onboarding completed', user: user.toPublicJSON(), emailPreview });
   } catch (err) {
     next(err);
   }
