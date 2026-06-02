@@ -101,6 +101,27 @@ exports.unbanUser = async (req, res, next) => {
   }
 };
 
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const userId = req.params.id;
+    const user = await User.findById(userId);
+    if (!user) throw new AppError('User not found', 404);
+
+    console.log(`[Admin Action] Deleting user ${user.username} (${user.email}) completely.`);
+
+    // Cascading deletion
+    await Promise.all([
+      Question.deleteMany({ author: userId }),
+      Answer.deleteMany({ author: userId }),
+      User.deleteOne({ _id: userId })
+    ]);
+
+    res.json({ success: true, message: 'User and all related data deleted successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.getFlaggedContent = async (req, res, next) => {
   try {
     const [flaggedQuestions, flaggedAnswers] = await Promise.all([

@@ -132,6 +132,18 @@ export default function AdminPage() {
       fetchUsers();
     } catch (err) { toast.error(err.message); }
   };
+  const handleDeleteUser = async (userId, username) => {
+    if (!confirm(`Are you absolutely sure you want to permanently delete user @${username}? This action is irreversible and will delete all of their questions, answers, and platform statistics.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/admin/users/${userId}`);
+      toast.success('User deleted successfully');
+      fetchUsers();
+    } catch (err) {
+      toast.error(err.message || 'Failed to delete user');
+    }
+  };
   const handleRoleChange = async (userId, role) => {
     try {
       await api.put(`/admin/users/${userId}/role`, { role });
@@ -274,12 +286,15 @@ export default function AdminPage() {
                       {u.isBanned ? <span className="badge-red">Banned</span> : <span className="badge-green">Active</span>}
                     </td>
                     <td className="px-4 py-3 text-[var(--color-text-secondary)] text-xs">{formatDate(u.createdAt)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-3 flex items-center gap-2">
                       {u.isBanned ? (
                         <button onClick={() => handleUnban(u._id)} className="btn-secondary btn-sm">Unban</button>
                       ) : (
                         <button onClick={() => handleBan(u._id)} className="btn-danger btn-sm">Ban</button>
                       )}
+                      <button onClick={() => handleDeleteUser(u._id, u.username)} className="px-2.5 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors">
+                        Delete
+                      </button>
                     </td>
                   </tr>
                 ))}

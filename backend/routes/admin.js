@@ -9,6 +9,7 @@ router.get('/users', auth, adminOnly, ctrl.getUsers);
 router.put('/users/:id/role', auth, adminOnly, ctrl.updateUserRole);
 router.post('/users/:id/ban', auth, adminOnly, ctrl.banUser);
 router.post('/users/:id/unban', auth, adminOnly, ctrl.unbanUser);
+router.delete('/users/:id', auth, adminOnly, ctrl.deleteUser);
 router.get('/flagged', auth, adminOnly, ctrl.getFlaggedContent);
 router.post('/cache/clear', auth, adminOnly, ctrl.clearCache);
 
