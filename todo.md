@@ -312,11 +312,40 @@ Medium-Impact Quality of Life
 - [x] **Personalized Onboarding & Quick Phase Selection**:
   - Every new user is guided through the step-by-step onboarding walkthrough to select their current internship phase (`pre`, `phase1_coursework`, etc.).
   - Existing users without a set phase are presented with a focused, non-obtrusive "Quick Phase Update" popup to select their phase without the full tutorial walkthrough.
-  - Onboarding states are saved to MongoDB and synced locally in a user-specific session storage key (`phase_prompt_dismissed_${user.id}`) to avoid cross-user session leaks in multi-user test environments.
+  - Onboarding states are saved to MongoDB and synced locally in a user-specific local storage key (`phase_prompt_dismissed_${user.id}`) to avoid cross-user session leaks in multi-user test environments and prevent the onboarding modal from repeating on new logins.
 - [x] **Tag Cleanup**: Removed placeholder/dummy tags (`#vibe lms`, `#getting started`) and added a backend-level filter to retrieve only official tags or tags with associated questions (`questionCount > 0`).
 
 
 ### Recent Fixes
+
+#### Latest Fixes (June 2, 2026)
+
+1. **Persistent Onboarding Modal Popup**
+   * *Root Cause*: Dismissing the onboarding phase prompt saved state only to `sessionStorage` (cleared on logout/tab close) and left `currentPhase` empty. If a user didn't choose a phase, they were prompted in every new session because `needsPhaseSelection` remained true.
+   * *Resolution*: Converted onboarding dismissed/skipped state storage from `sessionStorage` to `localStorage` under `phase_prompt_dismissed_${user.id}`. Once dismissed or skipped, the user will never see the modal again across different logins.
+
+2. **Real-time Leaderboard Broadcasts on Acceptance**
+   * *Root Cause*: The real-time Socket.IO update (`broadcastLeaderboard()`) was not being triggered upon answer acceptance (`acceptAnswer`), meaning users had to reload the page to see changes in the leaderboard standing.
+   * *Resolution*: Injected `broadcastLeaderboard()` directly into the `acceptAnswer` controller (in `backend/controllers/answerController.js`) right after the reputation increase, aligning it with unaccept and vote handlers.
+
+3. **Admin Panel Discovery & Navigation**
+   * *Root Cause*: The Admin Dashboard link was buried inside the profile photo dropdown, making it hard for admins/moderators to locate.
+   * *Resolution*: Added a highly visible, rose-accented **Admin Panel** link directly in the primary horizontal Navbar header next to "Community" for authenticated admins and moderators.
+
+4. **SMTP Nodemailer Automated Real-Time Notifications**
+   * *Root Cause*: The user required real-time email alerts to engage registered members on onboarding, leaderboard achievements, new posts, and resolution events.
+   * *Resolution*: Implemented a robust Nodemailer service (`backend/services/emailService.js`) with Gmail SMTP integration and fallback support, triggering real-time broadcasts for onboarding, Top 10 standing, new question alerts to all users, and "Me Too" doubt solved events.
+
+5. **Google Sign-In Account Syncing**
+   * *Root Cause*: Google profile picture, display name, and email alterations were not consistently updating or sync-saving into MongoDB upon logging in.
+   * *Resolution*: Upgraded `googleLogin` in `backend/controllers/authController.js` to comprehensively sync and scrape Google Profile updates (email, displayName, and avatar) on every sign-in.
+
+6. **Clean Database Seeding in Production**
+   * *Root Cause*: The database seeded fake profiles and questions on every dev restart, which cluttered production environments when run on public servers.
+   * *Resolution*: Added environment checks to `seedDatabase`. It now only seeds mock accounts in development and actively deletes mock users and their associated questions in production mode.
+
+
+#### Older Fixes
 
 1. **"User not found" and Question Marks on Profile Page Questions**
    *Root Cause*: When loading questions posted by a user on their profile page (`GET /api/users/:username/questions`), the backend was not populating the `author` field and used a restrictive `.select()`. This caused the frontend to lack the user's name/avatar, showing a fallback `?` and linking to `/users/undefined` → “User not found”.
