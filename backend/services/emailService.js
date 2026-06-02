@@ -86,14 +86,21 @@ exports.sendOnboardingEmail = async (user) => {
       </div>
     `;
 
-    await transporter.sendMail({
+    const info = await transporter.sendMail({
       from: `PrashnaSārathi <${SENDER_EMAIL}>`,
       to: user.email,
       subject: 'Welcome to PrashnaSārathi! 🚀 Onboarding Completed',
       html: htmlContent
     });
+    return {
+      info,
+      subject: 'Welcome to PrashnaSārathi! 🚀 Onboarding Completed',
+      html: htmlContent,
+      simulated: !process.env.SMTP_USER || !process.env.SMTP_PASS
+    };
   } catch (err) {
     console.error('Error sending onboarding email:', err.message);
+    return null;
   }
 };
 
