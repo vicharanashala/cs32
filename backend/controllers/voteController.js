@@ -63,7 +63,7 @@ exports.vote = async (req, res, next) => {
       releaseVoteLock(req.user._id, targetId);
       try {
         const { broadcastLeaderboard } = require('../services/leaderboardService');
-        broadcastLeaderboard();
+        await broadcastLeaderboard();
       } catch (lErr) {}
       return res.json({ message: 'Vote removed', vote: null });
     }
@@ -81,7 +81,7 @@ exports.vote = async (req, res, next) => {
       releaseVoteLock(req.user._id, targetId);
       try {
         const { broadcastLeaderboard } = require('../services/leaderboardService');
-        broadcastLeaderboard();
+        await broadcastLeaderboard();
       } catch (lErr) {}
       return res.json({ message: 'Vote updated', vote: existingVote });
     }
@@ -155,7 +155,7 @@ exports.vote = async (req, res, next) => {
     releaseVoteLock(req.user._id, targetId);
     try {
       const { broadcastLeaderboard } = require('../services/leaderboardService');
-      broadcastLeaderboard();
+      await broadcastLeaderboard();
     } catch (lErr) {}
     res.status(201).json({ message: 'Voted', vote });
   } catch (err) {
