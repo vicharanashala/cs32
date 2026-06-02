@@ -39,7 +39,17 @@ setupSocket(server);
 
 // Middleware
 app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
-app.use(cors({ origin: config.clientUrl, credentials: true }));
+app.use(cors({
+  origin: (origin, callback) => {
+    const allowed = [config.clientUrl, /\.vercel\.app$/];
+    if (!origin || allowed.some(o => typeof o === 'string' ? o === origin : o.test(origin))) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+}));
 app.use(morgan('dev'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
@@ -94,9 +104,12 @@ const startServer = async () => {
   });
 };
 
-// On Vercel (serverless), skip listen() — Vercel imports and serves the app directly
-if (!process.env.VERCEL) {
+if (process.env.VERCEL) {
+  // Vercel: connect DB only — Vercel handles HTTP serving, no listen() needed
+  connectDB().catch(err => console.error('DB connection error on Vercel:', err));
+} else {
   startServer();
 }
 
-module.exports = { app, server };
+// Export app for Vercel serverless (needs plain Express app, not {app,server})
+module.exports = app;
