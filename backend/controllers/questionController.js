@@ -57,6 +57,9 @@ exports.createQuestion = async (req, res, next) => {
 
     const question = await Question.create(questionData);
 
+    const { processAnomalyClassification } = require('../services/anomalyService');
+    await processAnomalyClassification(question._id);
+
     if (existingQuestion) {
       await Question.findByIdAndUpdate(existingQuestion.question._id, {
         $addToSet: { relatedQuestions: question._id },
@@ -146,8 +149,9 @@ async function findExistingQuestion(title, tagNames) {
         similarMatch.title.toLowerCase().includes(w)
       );
       const hasMatchingTags = similarMatch.tagNames.some(t => tagNames.includes(t));
-      const scopeMatch = hasSimilarTitle && hasMatchingTags ? 'similar' : 'tag';
-      return { question: similarMatch, scopeMatch };
+      if (hasSimilarTitle && hasMatchingTags) {
+        return { question: similarMatch, scopeMatch: 'similar' };
+      }
     }
   }
 
@@ -157,7 +161,7 @@ async function findExistingQuestion(title, tagNames) {
 exports.getQuestions = async (req, res, next) => {
   try {
     const { page, limit, skip } = paginate(req.query.page, req.query.limit);
-    const filter = { status: 'open', isDeleted: false };
+    const filter = { isDeleted: { $ne: true } };
 
     if (req.query.tag) filter.tagNames = req.query.tag.toLowerCase();
     if (req.query.author) filter.author = req.query.author;
@@ -177,6 +181,7 @@ exports.getQuestions = async (req, res, next) => {
     }
 
     const isModOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'moderator');
+    const currentUserId = req.user ? req.user._id.toString() : null;
 
     const [questions, total] = await Promise.all([
       Question.find(filter)
@@ -189,8 +194,9 @@ exports.getQuestions = async (req, res, next) => {
     ]);
 
     const withOwner = questions.map(q => {
-      const isAuthor = req.user && q.author && q.author._id && q.author._id.toString() === req.user._id.toString();
-      const anonymized = q.isAnonymous && !isModOrAdmin ? {
+      const authorId = q.author && q.author._id ? q.author._id.toString() : null;
+      const isAuthor = currentUserId && authorId && currentUserId === authorId;
+      const anonymized = q.isAnonymous && !isAuthor && !isModOrAdmin ? {
         ...q.toObject(),
         author: {
           _id: 'anonymous',
@@ -202,7 +208,7 @@ exports.getQuestions = async (req, res, next) => {
       } : q.toObject();
       return {
         ...anonymized,
-        hasMeToo: req.user ? q.meTooUsers && q.meTooUsers.some(u => u.toString() === req.user._id.toString()) : false,
+        hasMeToo: currentUserId ? q.meTooUsers && q.meTooUsers.some(u => u.toString() === currentUserId) : false,
         isOwner: isAuthor,
       };
     });
@@ -608,6 +614,30 @@ exports.escalateQuestion = async (req, res, next) => {
     ));
 
     res.json({ message: 'Question escalated', question });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.selfEscalateAnomaly = async (req, res, next) => {
+  try {
+    const question = await Question.findById(req.params.id);
+    if (!question) throw new AppError('Question not found', 404);
+    
+    if (question.author.toString() !== req.user._id.toString()) {
+      throw new AppError('Only the author can self-escalate their question', 403);
+    }
+
+    question.anomalySeverity = 'high';
+    question.anomalyScore = Math.max(85, question.anomalyScore || 0);
+    question.alertSent = true;
+    await question.save();
+
+    const { alertAdminsAndModerators } = require('../services/anomalyService');
+    const subject = `[SELF-ESCALATED HIGH ALERT] User query marked urgent by author`;
+    await alertAdminsAndModerators(question, subject);
+
+    res.json({ message: 'Question successfully escalated to urgent status', question });
   } catch (err) {
     next(err);
   }

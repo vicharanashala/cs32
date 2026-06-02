@@ -1,6 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/context/AuthContext';
 import { useSocket } from '@/context/SocketContext';
 import { getInitials } from '@/lib/utils';
 import api from '@/lib/api';
@@ -9,9 +11,11 @@ export default function CommunityPage() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [loading, setLoading] = useState(true);
   const socket = useSocket();
+  const { user, loading: authLoading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
-    // Fetch initial leaderboard data
+    // Fetch initial leaderboard data (public, no auth required)
     api.get('/users/leaderboard')
       .then(data => {
         setLeaderboard(data.leaderboard || []);

@@ -98,7 +98,11 @@ export default function QuestionDetailPage() {
   }, [socket, id]);
 
   const handleVote = async (targetType, targetId, voteType, reasonData = null) => {
-    if (!user) { toast.error('Please login to vote'); return; }
+    if (!user) {
+      toast.error('Please login to vote');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       const payload = { targetType, targetId, voteType };
       if (voteType === 'downvote' && reasonData) {
@@ -117,6 +121,11 @@ export default function QuestionDetailPage() {
   };
 
   const openDownvoteModal = (targetType, targetId) => {
+    if (!user) {
+      toast.error('Please login to vote');
+      router.push('/auth?mode=login');
+      return;
+    }
     setShowDownvoteModal({ open: true, targetType, targetId });
   };
 
@@ -126,7 +135,11 @@ export default function QuestionDetailPage() {
   };
 
   const handleSave = async () => {
-    if (!user) { toast.error('Please login to save'); return; }
+    if (!user) {
+      toast.error('Please login to save');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       if (saved) {
         await api.delete(`/users/me/saved/${id}`);
@@ -142,8 +155,22 @@ export default function QuestionDetailPage() {
     }
   };
 
+  const handleSelfEscalate = async () => {
+    try {
+      const res = await api.patch(`/questions/${id}/urgent`);
+      setQuestion(res.question);
+      toast.success('Your question has been escalated to urgent status!');
+    } catch (err) {
+      toast.error(err.message || 'Failed to escalate question');
+    }
+  };
+
   const handleMeToo = async () => {
-    if (!user) { toast.error('Please login to use this feature'); return; }
+    if (!user) {
+      toast.error('Please login to use this feature');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       const data = await api.patch(`/questions/${id}/me-too`);
       setQuestion(prev => prev ? { ...prev, meTooCount: data.meTooCount, hasMeToo: data.hasMeToo } : prev);
@@ -154,7 +181,11 @@ export default function QuestionDetailPage() {
   };
 
   const handleSolvedMyDoubt = async (answerId) => {
-    if (!user) { toast.error('Please login to use this feature'); return; }
+    if (!user) {
+      toast.error('Please login to use this feature');
+      router.push('/auth?mode=login');
+      return;
+    }
     try {
       const data = await api.patch(`/answers/${answerId}/solved-my-doubt`);
       setSolvedDoubtAnswers(prev => ({
@@ -171,7 +202,11 @@ export default function QuestionDetailPage() {
 
   const handleSubmitAnswer = async (e) => {
     e.preventDefault();
-    if (!user) { toast.error('Please login to answer'); return; }
+    if (!user) {
+      toast.error('Please login to answer');
+      router.push('/auth?mode=login');
+      return;
+    }
     if (newAnswer.length < 10) { toast.error('Answer too short'); return; }
 
     setAnswering(true);
@@ -428,6 +463,47 @@ export default function QuestionDetailPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
           <span>Verified on {formatDate(question.lastVerifiedAt)}</span>
+        </div>
+      )}
+
+      {/* Anomaly Detection Banners */}
+      {question.anomalySeverity === 'high' && (
+        <div className="mb-4 p-4 bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg shadow-sm animate-pulse">
+          <div className="flex items-center gap-2 text-red-800 dark:text-red-400">
+            <svg className="w-5 h-5 animate-bounce" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+            <span className="font-semibold text-sm">Your query has been flagged as urgent. Our team has been notified and will respond shortly.</span>
+          </div>
+        </div>
+      )}
+
+      {question.anomalySeverity === 'medium' && (
+        <div className="mb-4 p-4 bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg shadow-sm">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-400">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="font-semibold text-sm">Your query is in our review queue. You'll hear back soon.</span>
+          </div>
+        </div>
+      )}
+
+      {user && (question.author?._id === user._id || question.author === user._id) && 
+        (question.anomalySeverity === 'low' || question.anomalySeverity === 'none' || !question.anomalySeverity) && (
+        <div className="mb-4 p-4 bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900/50 rounded-lg flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-blue-800 dark:text-blue-400">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <span className="text-sm font-medium">Is this issue blocking your progress? You can self-escalate it.</span>
+          </div>
+          <button
+            onClick={handleSelfEscalate}
+            className="btn-primary btn-sm px-4 py-1.5 text-xs font-semibold shrink-0"
+          >
+            This is urgent
+          </button>
         </div>
       )}
 

@@ -7,6 +7,7 @@ const ctrl = require('../controllers/authController');
 
 router.post('/register', authLimiter, registerValidation, ctrl.register);
 router.post('/login', authLimiter, loginValidation, ctrl.login);
+router.post('/google', authLimiter, ctrl.googleLogin);
 router.get('/me', auth, ctrl.getMe);
 router.put('/profile', auth, upload.single('avatar'), ctrl.updateProfile);
 

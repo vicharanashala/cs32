@@ -100,6 +100,16 @@ function FAQsPageContent() {
 
   const isAdminOrMod = user && (user.role === 'admin' || user.role === 'moderator');
 
+  useEffect(() => {
+    if (searchParams.get('add') === 'true') {
+      if (isAdminOrMod) {
+        setShowAddFAQModal(true);
+      } else {
+        toast.error('Only administrators or moderators can create FAQs directly. Please ask a question instead!');
+      }
+    }
+  }, [searchParams, isAdminOrMod]);
+
   const handleAddCategory = async (e) => {
     e.preventDefault();
     if (!newCategoryName.trim()) return;

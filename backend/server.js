@@ -87,6 +87,10 @@ const startServer = async () => {
 
   server.listen(config.port, () => {
     console.log(`Server running on port ${config.port} in ${config.env} mode`);
+
+    // Start Anomaly Auto-Escalation Check Job every 60 seconds
+    const { checkAndEscalateAnomalies } = require('./services/anomalyService');
+    setInterval(checkAndEscalateAnomalies, 60000);
   });
 };
 
