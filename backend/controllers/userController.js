@@ -134,7 +134,7 @@ exports.completeOnboarding = async (req, res, next) => {
     // Trigger Onboarding welcome email via Nodemailer
     try {
       const { sendOnboardingEmail } = require('../services/emailService');
-      sendOnboardingEmail(user);
+      await sendOnboardingEmail(user);
     } catch (emailErr) {
       console.error('Email notification error:', emailErr.message);
     }

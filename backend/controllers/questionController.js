@@ -79,7 +79,7 @@ exports.createQuestion = async (req, res, next) => {
     try {
       const { sendNewQuestionNotification } = require('../services/emailService');
       const authorName = populated.author ? (populated.author.displayName || populated.author.username) : 'Anonymous';
-      sendNewQuestionNotification(populated, authorName);
+      await sendNewQuestionNotification(populated, authorName);
     } catch (emailErr) {
       console.error('Email notification error:', emailErr.message);
     }

@@ -188,8 +188,6 @@ exports.acceptAnswer = async (req, res, next) => {
     // Reward answer author
     await User.findByIdAndUpdate(answer.author, { $inc: { reputation: 15 } });
 
-    broadcastLeaderboard();
-
     await Notification.create({
       recipient: answer.author,
       type: 'answer_accepted',
@@ -221,13 +219,13 @@ exports.acceptAnswer = async (req, res, next) => {
         const { sendDoubtSolvedNotification } = require('../services/emailService');
         const solver = await User.findById(answer.author);
         const solverName = solver ? (solver.displayName || solver.username) : 'A community peer';
-        sendDoubtSolvedNotification(question, answer.body, solverName);
+        await sendDoubtSolvedNotification(question, answer.body, solverName);
       } catch (emailErr) {
         console.error('Email notification error:', emailErr.message);
       }
     }
 
-    broadcastLeaderboard();
+    await broadcastLeaderboard();
     res.json({ answer, message: 'Answer accepted' });
   } catch (err) {
     next(err);
@@ -266,7 +264,7 @@ exports.unacceptAnswer = async (req, res, next) => {
     // Remove reputation reward
     await User.findByIdAndUpdate(answer.author, { $inc: { reputation: -15 } });
 
-    broadcastLeaderboard();
+    await broadcastLeaderboard();
     res.json({ answer, message: 'Answer unaccepted' });
   } catch (err) {
     next(err);
@@ -300,7 +298,7 @@ exports.toggleSolvedMyDoubt = async (req, res, next) => {
       solvedMyDoubtCount: answer.solvedMyDoubtCount,
     });
 
-    broadcastLeaderboard();
+    await broadcastLeaderboard();
     res.json({
       solvedMyDoubtCount: answer.solvedMyDoubtCount,
       hasSolvedMyDoubt: !alreadySolved,
