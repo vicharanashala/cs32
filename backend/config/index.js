@@ -1,4 +1,5 @@
-require('dotenv').config();
+require('dotenv').config({ path: require('path').join(__dirname, '../../secrets.env') });
+
 
 const config = {
   env: process.env.NODE_ENV || 'development',
