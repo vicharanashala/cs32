@@ -113,6 +113,130 @@ exports.getFlaggedContent = async (req, res, next) => {
   }
 };
 
+exports.getAnomalies = async (req, res, next) => {
+  try {
+    const { severity, status, sortBy = 'time', page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
+
+    const filter = { anomalySeverity: { $in: ['high', 'medium', 'low'] } };
+    
+    if (severity && severity !== 'all') {
+      filter.anomalySeverity = severity;
+    }
+    
+    if (status === 'resolved') {
+      filter.anomalyResolvedAt = { $ne: null };
+    } else if (status === 'unresolved') {
+      filter.anomalyResolvedAt = null;
+    }
+
+    const sort = {};
+    if (sortBy === 'severity') {
+      sort.anomalyScore = -1;
+    } else {
+      sort.createdAt = -1;
+    }
+
+    const [anomalies, total] = await Promise.all([
+      Question.find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(parseInt(limit))
+        .populate('author', 'username displayName email')
+        .populate('anomalyResolvedBy', 'username displayName'),
+      Question.countDocuments(filter)
+    ]);
+
+    const resolvedStats = await Question.aggregate([
+      { 
+        $match: { 
+          anomalySeverity: { $in: ['high', 'medium', 'low'] },
+          anomalyResolvedAt: { $ne: null } 
+        } 
+      },
+      {
+        $group: {
+          _id: '$anomalySeverity',
+          count: { $sum: 1 },
+          totalMs: { $sum: { $subtract: ['$anomalyResolvedAt', '$createdAt'] } }
+        }
+      }
+    ]);
+
+    const avgResolutionTimes = {
+      high: 0,
+      medium: 0,
+      low: 0
+    };
+
+    resolvedStats.forEach(stat => {
+      const avgMinutes = stat.count > 0 ? Math.round(stat.totalMs / (1000 * 60) / stat.count) : 0;
+      avgResolutionTimes[stat._id] = avgMinutes;
+    });
+
+    const openHighCount = await Question.countDocuments({ anomalySeverity: 'high', anomalyResolvedAt: null });
+    const openMediumCount = await Question.countDocuments({ anomalySeverity: 'medium', anomalyResolvedAt: null });
+
+    const fourWeeksAgo = new Date();
+    fourWeeksAgo.setDate(fourWeeksAgo.getDate() - 28);
+
+    const trendStats = await Question.aggregate([
+      {
+        $match: {
+          anomalySeverity: { $in: ['high', 'medium', 'low'] },
+          createdAt: { $gte: fourWeeksAgo }
+        }
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%U', date: '$createdAt' }
+          },
+          count: { $sum: 1 }
+        }
+      },
+      { $sort: { _id: 1 } }
+    ]);
+
+    res.json({
+      anomalies,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / parseInt(limit))
+      },
+      stats: {
+        openHighCount,
+        openMediumCount,
+        avgResolutionTimes,
+        trend: trendStats.map(t => ({ week: t._id, count: t.count }))
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.resolveAnomaly = async (req, res, next) => {
+  try {
+    const question = await Question.findById(req.params.id);
+    if (!question) throw new AppError('Question not found', 404);
+
+    question.anomalyResolvedAt = new Date();
+    question.anomalyResolvedBy = req.user._id;
+    await question.save();
+
+    const populated = await Question.findById(question._id)
+      .populate('author', 'username displayName email')
+      .populate('anomalyResolvedBy', 'username displayName');
+
+    res.json({ message: 'Anomaly marked as resolved', question: populated });
+  } catch (err) {
+    next(err);
+  }
+};
+
 exports.clearCache = async (req, res) => {
   try {
     const redis = getRedis();

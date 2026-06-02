@@ -76,7 +76,18 @@ exports.getFAQs = async (req, res, next) => {
 
 exports.getFAQBySlug = async (req, res, next) => {
   try {
-    const faq = await FAQ.findOne({ slug: req.params.slug, isPublished: true })
+    const mongoose = require('mongoose');
+    const query = { isPublished: true };
+    if (mongoose.Types.ObjectId.isValid(req.params.slug)) {
+      query.$or = [
+        { _id: req.params.slug },
+        { slug: req.params.slug }
+      ];
+    } else {
+      query.slug = req.params.slug;
+    }
+
+    const faq = await FAQ.findOne(query)
       .populate('author', 'username displayName avatar')
       .populate('items.reviewedBy', 'username displayName');
 
@@ -85,6 +96,10 @@ exports.getFAQBySlug = async (req, res, next) => {
 
     const userId = req.user?._id;
     if (userId) {
+      const { recordTagAffinity } = require('../services/recommendationService');
+      if (faq.tags && faq.tags.length > 0) {
+        recordTagAffinity(userId, faq.tags);
+      }
       faq.items.forEach(item => {
         const userVote = item.userFeedback.find(f => f.user.toString() === userId.toString());
         item.userVote = userVote ? (userVote.helpful ? 'helpful' : 'notHelpful') : null;
@@ -231,8 +246,43 @@ exports.markFAQHelpful = async (req, res, next) => {
       item.userFeedback.push({ user: userId, helpful });
     }
 
+    if (userId && helpful && !undo) {
+      const { recordTagAffinity } = require('../services/recommendationService');
+      const allTags = [...(faq.tags || []), ...(item.tags || [])];
+      if (allTags.length > 0) {
+        recordTagAffinity(userId, allTags);
+      }
+    }
+
     await faq.save();
     res.json({ message: 'Feedback recorded', helpfulCount: item.helpfulCount, notHelpfulCount: item.notHelpfulCount, voted: helpful ? 'helpful' : 'notHelpful' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getRecommendedFAQs = async (req, res, next) => {
+  try {
+    const { getRecommendedFAQs } = require('../services/recommendationService');
+    const { getRedis } = require('../config/redis');
+
+    const userId = req.user?._id?.toString() || req.query.userId || 'guest';
+    const cacheKey = `recommendations:user:${userId}`;
+    const redis = getRedis();
+
+    // Check cache
+    const cached = await redis.get(cacheKey).catch(() => null);
+    if (cached) {
+      return res.json({ faqs: JSON.parse(cached) });
+    }
+
+    // Get recommendations
+    const recommendations = await getRecommendedFAQs(userId === 'guest' ? null : userId);
+
+    // Save to cache for 60 minutes
+    await redis.setex(cacheKey, 3600, JSON.stringify(recommendations)).catch(() => {});
+
+    res.json({ faqs: recommendations });
   } catch (err) {
     next(err);
   }

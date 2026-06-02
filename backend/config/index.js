@@ -20,6 +20,11 @@ const config = {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   },
   clientUrl: process.env.CLIENT_URL || 'http://localhost:3000',
+  webPush: {
+    subject: process.env.VAPID_SUBJECT || 'mailto:admin@quorafaq.com',
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY,
+  },
 };
 
 module.exports = config;

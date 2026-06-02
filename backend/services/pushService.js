@@ -2,16 +2,25 @@ const webpush = require('web-push');
 const config = require('../config');
 const User = require('../models/User');
 
-webpush.setVapidDetails(
-  config.webPush.subject,
-  config.webPush.publicKey,
-  config.webPush.privateKey
-);
+const hasVapidKeys = config.webPush && config.webPush.publicKey && config.webPush.privateKey;
+
+if (hasVapidKeys) {
+  webpush.setVapidDetails(
+    config.webPush.subject || 'mailto:admin@quorafaq.com',
+    config.webPush.publicKey,
+    config.webPush.privateKey
+  );
+} else {
+  console.warn('WebPush VAPID details not configured. Push notifications are disabled.');
+}
 
 const sendPushNotification = async (userId, payload) => {
   try {
+    if (!hasVapidKeys) {
+      return { sent: false, reason: 'not_configured' };
+    }
     const user = await User.findById(userId);
-    if (!user || !user.pushSubscription || !user.preferences.pushNotifications) {
+    if (!user || !user.pushSubscription || !user.preferences || !user.preferences.pushNotifications) {
       return { sent: false, reason: 'no_subscription' };
     }
 

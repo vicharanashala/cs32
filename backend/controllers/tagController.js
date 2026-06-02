@@ -4,7 +4,7 @@ const { AppError } = require('../middleware/errorHandler');
 
 exports.getTags = async (req, res, next) => {
   try {
-    const filter = {};
+    const filter = { questionCount: { $gt: 0 } };
     if (req.query.search) {
       filter.name = { $regex: req.query.search, $options: 'i' };
     }

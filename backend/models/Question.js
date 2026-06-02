@@ -98,6 +98,11 @@ const questionSchema = new mongoose.Schema({
   },
 
   // Moderation
+  status: {
+    type: String,
+    enum: ['open', 'closed', 'deleted'],
+    default: 'open',
+  },
   isLocked: { type: Boolean, default: false },
   isDeleted: { type: Boolean, default: false },
   isFlagged: { type: Boolean, default: false },
@@ -107,11 +112,18 @@ const questionSchema = new mongoose.Schema({
   closedReason: { type: String },
   closedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
-  status: {
+  // Anomaly Detection
+  anomalyScore: { type: Number, default: 0 },
+  anomalySeverity: {
     type: String,
-    enum: ['open', 'closed', 'deleted'],
-    default: 'open',
+    enum: ['high', 'medium', 'low', 'none'],
+    default: 'none',
   },
+  alertSent: { type: Boolean, default: false },
+  anomalyResolvedAt: { type: Date, default: null },
+  anomalyResolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  escalated15MinSent: { type: Boolean, default: false },
+  escalated30MinSent: { type: Boolean, default: false },
 
   // Timestamps
   lastActivity: { type: Date },

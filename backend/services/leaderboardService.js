@@ -3,7 +3,8 @@ const Answer = require('../models/Answer');
 const { getIO } = require('../socket');
 
 const getLeaderboardData = async () => {
-  const leaderboard = await Answer.aggregate([
+  // Primary: users who resolved doubts (accepted answers or solved-my-doubt votes)
+  let leaderboard = await Answer.aggregate([
     { $match: { isDeleted: false, $or: [{ isAccepted: true }, { solvedMyDoubtCount: { $gt: 0 } }] } },
     { $group: { 
         _id: '$author', 
@@ -25,6 +26,26 @@ const getLeaderboardData = async () => {
         'user.reputation': 1,
     }}
   ]);
+
+  // Fallback: if no resolved answers yet, show top users by reputation
+  if (leaderboard.length === 0) {
+    const topUsers = await User.find({ isBanned: { $ne: true } })
+      .sort({ reputation: -1 })
+      .limit(20)
+      .select('username displayName avatar reputation')
+      .lean();
+    leaderboard = topUsers.map(u => ({
+      resolvedCount: 0,
+      totalSolvedVotes: 0,
+      user: {
+        username: u.username,
+        displayName: u.displayName,
+        avatar: u.avatar,
+        reputation: u.reputation || 0,
+      }
+    }));
+  }
+
   return leaderboard;
 };
 

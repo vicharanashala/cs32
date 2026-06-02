@@ -1,4 +1,3 @@
-# Wait for all required services before starting
 #!/bin/sh
 set -e
 

@@ -10,15 +10,47 @@ const { getLeaderboardData } = require('../services/leaderboardService');
 
 exports.getUserProfile = async (req, res, next) => {
   try {
-    const user = await User.findOne({ username: req.params.username });
+    const safeUsername = req.params.username.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const user = await User.findOne({ username: { $regex: new RegExp(`^${safeUsername}$`, 'i') } });
     if (!user) throw new AppError('User not found', 404);
 
-    const [questions, answers] = await Promise.all([
+    const [questions, answers, questionLikes, answerLikes, questionVotes, answerVotes, savedQuestionsCount, savedFaqsCount] = await Promise.all([
       Question.countDocuments({ author: user._id, isDeleted: false }),
       Answer.countDocuments({ author: user._id, isDeleted: false }),
+      Question.aggregate([
+        { $match: { author: user._id, isDeleted: false } },
+        { $group: { _id: null, total: { $sum: '$upvotes' } } }
+      ]),
+      Answer.aggregate([
+        { $match: { author: user._id, isDeleted: false } },
+        { $group: { _id: null, total: { $sum: '$upvotes' } } }
+      ]),
+      Question.aggregate([
+        { $match: { author: user._id, isDeleted: false } },
+        { $group: { _id: null, up: { $sum: '$upvotes' }, down: { $sum: '$downvotes' } } }
+      ]),
+      Answer.aggregate([
+        { $match: { author: user._id, isDeleted: false } },
+        { $group: { _id: null, up: { $sum: '$upvotes' }, down: { $sum: '$downvotes' } } }
+      ]),
+      SavedQuestion.countDocuments({ user: user._id }),
+      SavedFAQ.countDocuments({ user: user._id })
     ]);
 
-    res.json({ user: { ...user.toPublicJSON(), questionCount: questions, answerCount: answers } });
+    const totalLikes = (questionLikes[0]?.total || 0) + (answerLikes[0]?.total || 0);
+    const totalVotes = (questionVotes[0]?.up || 0) + (questionVotes[0]?.down || 0) + (answerVotes[0]?.up || 0) + (answerVotes[0]?.down || 0);
+    const totalBookmarks = savedQuestionsCount + savedFaqsCount;
+
+    res.json({
+      user: {
+        ...user.toPublicJSON(),
+        questionCount: questions,
+        answerCount: answers,
+        totalLikes,
+        totalVotes,
+        totalBookmarks
+      }
+    });
   } catch (err) {
     next(err);
   }
@@ -26,7 +58,8 @@ exports.getUserProfile = async (req, res, next) => {
 
 exports.getUserQuestions = async (req, res, next) => {
   try {
-    const user = await User.findOne({ username: req.params.username });
+    const safeUsername = req.params.username.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const user = await User.findOne({ username: { $regex: new RegExp(`^${safeUsername}$`, 'i') } });
     if (!user) throw new AppError('User not found', 404);
 
     const { page, limit, skip } = paginate(req.query.page, req.query.limit);
@@ -35,8 +68,8 @@ exports.getUserQuestions = async (req, res, next) => {
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(limit)
-        .populate('tags', 'name color')
-        .select('title upvotes answerCount viewCount createdAt tagNames'),
+        .populate('author', 'username displayName avatar reputation')
+        .populate('tags', 'name color'),
       Question.countDocuments({ author: user._id, isDeleted: false }),
     ]);
 
@@ -48,7 +81,8 @@ exports.getUserQuestions = async (req, res, next) => {
 
 exports.getUserAnswers = async (req, res, next) => {
   try {
-    const user = await User.findOne({ username: req.params.username });
+    const safeUsername = req.params.username.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+    const user = await User.findOne({ username: { $regex: new RegExp(`^${safeUsername}$`, 'i') } });
     if (!user) throw new AppError('User not found', 404);
 
     const { page, limit, skip } = paginate(req.query.page, req.query.limit);
@@ -90,8 +124,23 @@ exports.getMeTooQuestions = async (req, res, next) => {
 
 exports.completeOnboarding = async (req, res, next) => {
   try {
-    await User.findByIdAndUpdate(req.user._id, { hasCompletedOnboarding: true });
-    res.json({ message: 'Onboarding completed' });
+    const { currentPhase } = req.body;
+    const updates = { hasCompletedOnboarding: true };
+    if (currentPhase) {
+      updates.currentPhase = currentPhase;
+    }
+    const user = await User.findByIdAndUpdate(req.user._id, updates, { new: true });
+
+    // Invalidate recommendation cache
+    try {
+      const { getRedis } = require('../config/redis');
+      const redis = getRedis();
+      await redis.del(`recommendations:user:${req.user._id.toString()}`);
+    } catch (redisErr) {
+      console.error('Redis delete recommendation cache error:', redisErr.message);
+    }
+
+    res.json({ message: 'Onboarding completed', user: user.toPublicJSON() });
   } catch (err) {
     next(err);
   }
@@ -194,6 +243,11 @@ exports.saveFAQ = async (req, res, next) => {
     await SavedFAQ.create({ user: req.user._id, faq: faqId });
     await FAQ.findByIdAndUpdate(faqId, { $inc: { saveCount: 1 } });
     await User.findByIdAndUpdate(req.user._id, { $inc: { savedCount: 1 } });
+
+    if (faq.tags && faq.tags.length > 0) {
+      const { recordTagAffinity } = require('../services/recommendationService');
+      recordTagAffinity(req.user._id, faq.tags);
+    }
 
     res.status(201).json({ message: 'FAQ saved' });
   } catch (err) {

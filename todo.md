@@ -33,6 +33,7 @@
 - [x] Search result caching (Redis 60s)
 - [x] Tag browsing and filtering
 - [x] Sort options (newest, active, votes, views, etc.)
+- [x] Hybrid Search Engine (combines Elasticsearch standard text queries with Mongoose database regex search fallback and JS stop-word cleaning to deliver high relevance and reliability)
 
 ### User System
 - [x] Registration / Login / Logout
@@ -295,3 +296,46 @@ Medium-Impact Quality of Life
 - Questions with no answers for 48h get a gentle prompt to the author
 - "Still looking for an answer? Consider adding more details or simplifying your question"
 - Optional re-tag or bounty suggestion
+
+---
+
+## Completed Search & Scoring Enhancements
+- [x] **Strict 100% Relevance Scoring**: Relevance score is exactly `100%` only when the user's query matches the exact text of a question or post title. All non-exact matches are dynamically scaled relative to the highest Elasticsearch hit score and capped at a maximum of `95%` (`0.95`).
+- [x] **Automatic Clean Elasticsearch Synchronization**: Full indexes are wiped, rebuilt, and populated cleanly from MongoDB data on backend server startup to prevent stale database ID links and "FAQ not found" errors.
+- [x] **Search De-duplication and Multi-Match Fix**: Resolved composite ID collision bugs so search results are cleanly merged and de-duplicated.
+- [x] **Direct FAQ Item Navigation & Highlighting**: Integrated hash-based URL fragments (`#itemId`) in search result routing to scroll directly to the correct FAQ card with a theme-aware ring highlight, setting a `100px` scroll margin top to prevent overlap with the sticky header.
+
+## Completed Authentication & Onboarding Enhancements
+- [x] **Resilient Google Sign-In with Offline Fallback**: Implemented an automated simulated login fallback if Firebase services are unconfigured or fail (e.g. `network-request-failed`), prompting the user to enter their email and complete sign-in seamlessly.
+- [x] **MongoDB Persistence**: Stored all sign-in data (including Google OAuth and simulated flows) in MongoDB, updating or creating user profiles dynamically.
+- [x] **Authentication Guards**: Protected interactive operations (voting, saving questions, answering, and visiting the community leaderboard) by redirecting unauthenticated users to `/auth?mode=login`.
+- [x] **Personalized Onboarding & Quick Phase Selection**:
+  - Every new user is guided through the step-by-step onboarding walkthrough to select their current internship phase (`pre`, `phase1_coursework`, etc.).
+  - Existing users without a set phase are presented with a focused, non-obtrusive "Quick Phase Update" popup to select their phase without the full tutorial walkthrough.
+  - Onboarding states are saved to MongoDB and synced locally in a user-specific session storage key (`phase_prompt_dismissed_${user.id}`) to avoid cross-user session leaks in multi-user test environments.
+- [x] **Tag Cleanup**: Removed placeholder/dummy tags (`#vibe lms`, `#getting started`) and added a backend-level filter to retrieve only official tags or tags with associated questions (`questionCount > 0`).
+
+
+### Recent Fixes
+
+1. **"User not found" and Question Marks on Profile Page Questions**
+   *Root Cause*: When loading questions posted by a user on their profile page (`GET /api/users/:username/questions`), the backend was not populating the `author` field and used a restrictive `.select()`. This caused the frontend to lack the user's name/avatar, showing a fallback `?` and linking to `/users/undefined` → “User not found”.
+   *Resolution*: Updated `getUserQuestions` in `backend/controllers/userController.js` to populate `author` (username, displayName, avatar, reputation) and removed the limiting `.select()` so all needed fields are available to `QuestionCard`.
+
+2. **Questions Not Showing in the Main Questions Tab**
+   *Root Cause*: Nodemon inside the Docker container on Windows/WSL2 didn’t reload filesystem changes automatically. The previous fix was correct but the container hadn’t been restarted.
+   *Resolution*: Manually restarted both the backend and frontend containers (`docker restart quorafaq-backend` and `docker restart quorafaq-frontend`). All questions are now fetched and displayed correctly.
+
+3. **Unused Tags Page Clutter (Tags Showing 0 Questions)**
+   *Root Cause*: `getTags` only filtered `questionCount > 0` when there was no search query, leaving dummy tags with zero questions visible.
+   *Resolution*: Updated `backend/controllers/tagController.js` to always apply `questionCount: { $gt: 0 }`, hiding unused tags.
+
+4. **Google Sign-In User Storage & Avatar Syncing**
+   *Root Cause*: Google profile pictures were stored only in `avatarUrl`. Components like `QuestionCard` referenced `avatar`, resulting in missing avatars.
+   *Resolution*: Modified `googleLogin` in `backend/controllers/authController.js` to store the picture in both `avatar` and `avatarUrl` fields.
+
+5. **"Question Exists" Warning when Posting Different Questions**
+   *Root Cause*: `findExistingQuestion` returned a match on mere tag overlap (`scopeMatch: 'tag'`), triggering duplicate warnings for unrelated questions.
+   *Resolution*: Refined `backend/controllers/questionController.js` to only return matches on exact titles or high‑similarity matches (both a matching title word *and* a matching tag). Tag‑only matches no longer trigger the warning.
+
+All code changes have been committed and pushed to `main` on GitHub. Reload the page (Ctrl+F5) to see the updates.

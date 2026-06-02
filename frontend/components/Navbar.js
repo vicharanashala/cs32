@@ -89,9 +89,22 @@ export default function Navbar({ onSearch }) {
                     onClick={() => setProfileOpen(!profileOpen)}
                     className="flex items-center gap-2 p-1.5 rounded-xl hover:bg-[var(--color-bg-tertiary)] transition-colors"
                   >
-                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-purple-500 text-white flex items-center justify-center text-sm font-semibold shadow-md">
-                      {getInitials(user.displayName || user.username)}
-                    </div>
+                    {user.avatar || user.avatarUrl ? (
+                      <img
+                        src={user.avatar ? (user.avatar.startsWith('http') ? user.avatar : `${(process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace('/api', '')}${user.avatar}`) : user.avatarUrl}
+                        alt={user.displayName || user.username}
+                        className="w-8 h-8 rounded-xl object-cover shadow-md border border-[var(--color-border)]/40"
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.style.display = 'none';
+                        }}
+                      />
+                    ) : null}
+                    {!(user.avatar || user.avatarUrl) && (
+                      <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--color-primary)] to-purple-500 text-white flex items-center justify-center text-sm font-semibold shadow-md">
+                        {getInitials(user.displayName || user.username)}
+                      </div>
+                    )}
                   </button>
                   {profileOpen && (
                     <>

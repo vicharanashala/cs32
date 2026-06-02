@@ -1,5 +1,5 @@
 const router = require('express').Router();
-const { auth, adminOnly } = require('../middleware/auth');
+const { auth, adminOnly, moderatorOrAdmin } = require('../middleware/auth');
 const ctrl = require('../controllers/adminController');
 
 router.get('/dashboard', auth, adminOnly, ctrl.getDashboard);
@@ -11,5 +11,8 @@ router.post('/users/:id/ban', auth, adminOnly, ctrl.banUser);
 router.post('/users/:id/unban', auth, adminOnly, ctrl.unbanUser);
 router.get('/flagged', auth, adminOnly, ctrl.getFlaggedContent);
 router.post('/cache/clear', auth, adminOnly, ctrl.clearCache);
+
+router.get('/anomalies', auth, moderatorOrAdmin, ctrl.getAnomalies);
+router.post('/anomalies/:id/resolve', auth, moderatorOrAdmin, ctrl.resolveAnomaly);
 
 module.exports = router;

@@ -19,13 +19,26 @@ const userSchema = new mongoose.Schema({
   },
   password: {
     type: String,
-    required: true,
+    required: function() {
+      return this.authProvider === 'email' || this.authProvider === 'both';
+    },
     minlength: 6,
     select: false,
   },
   displayName: { type: String, trim: true, maxlength: 50 },
   bio: { type: String, maxlength: 500 },
   avatar: { type: String, default: '' },
+  avatarUrl: { type: String },
+  googleId: {
+    type: String,
+    unique: true,
+    sparse: true,
+  },
+  authProvider: {
+    type: String,
+    enum: ['google', 'email', 'both'],
+    default: 'email',
+  },
   website: { type: String },
   location: { type: String },
   role: {
@@ -55,18 +68,27 @@ const userSchema = new mongoose.Schema({
 
   // Onboarding
   hasCompletedOnboarding: { type: Boolean, default: false },
+  currentPhase: {
+    type: String,
+    enum: ['pre', 'phase1_coursework', 'phase1_completed', 'phase2_project', 'completed']
+  },
+  tagAffinity: [{
+    tag: { type: String, required: true },
+    timestamp: { type: Date, default: Date.now }
+  }],
 }, { timestamps: true });
 
 userSchema.index({ username: 'text', displayName: 'text', bio: 'text' });
 userSchema.index({ role: 1 });
 
 userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) return next();
+  if (!this.password || !this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
   next();
 });
 
 userSchema.methods.comparePassword = async function (candidate) {
+  if (!this.password) return false;
   return bcrypt.compare(candidate, this.password);
 };
 
@@ -77,6 +99,7 @@ userSchema.methods.toPublicJSON = function () {
     displayName: this.displayName,
     bio: this.bio,
     avatar: this.avatar,
+    avatarUrl: this.avatarUrl,
     website: this.website,
     location: this.location,
     role: this.role,
@@ -85,6 +108,8 @@ userSchema.methods.toPublicJSON = function () {
     questionCount: this.questionCount,
     answerCount: this.answerCount,
     hasCompletedOnboarding: this.hasCompletedOnboarding,
+    currentPhase: this.currentPhase,
+    authProvider: this.authProvider,
     createdAt: this.createdAt,
   };
 };
