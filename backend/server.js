@@ -94,6 +94,9 @@ const startServer = async () => {
   });
 };
 
-startServer();
+// On Vercel (serverless), skip listen() — Vercel imports and serves the app directly
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 module.exports = { app, server };
