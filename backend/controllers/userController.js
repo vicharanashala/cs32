@@ -342,3 +342,15 @@ exports.getLeaderboard = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.getModerators = async (req, res, next) => {
+  try {
+    const moderators = await User.find({ role: { $in: ['moderator', 'admin'] } })
+      .select('username displayName avatar avatarUrl role reputation bio badges createdAt')
+      .sort({ reputation: -1, createdAt: 1 });
+    res.json({ moderators });
+  } catch (err) {
+    next(err);
+  }
+};
+

@@ -13,9 +13,6 @@ services:
       timeout: 5s
       retries: 8
       start_period: 10s
-    environment:
-      - PUID=${UID:-1000}
-      - PGID=${GID:-1000}
 
   elasticsearch:
     image: elasticsearch:8.11.0
@@ -27,20 +24,27 @@ services:
       - discovery.type=single-node
       - xpack.security.enabled=false
       - ES_JAVA_OPTS=-Xms512m -Xmx512m
-      - PUID=${UID:-1000}
-      - PGID=${GID:-1000}
+      # Disable memory lock to avoid issues on Windows/WSL2/Mac
+      - bootstrap.memory_lock=false
     volumes:
       - elasticsearch_data:/usr/share/elasticsearch/data
     healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:9200/_cluster/health | grep -q '\"status\":\"green\"\\|\"status\":\"yellow\"'"]
+      test: ["CMD-SHELL", "curl -fs http://localhost:9200/_cluster/health | grep -qE '\"status\":\"(green|yellow)\"'"]
       interval: 15s
       timeout: 10s
       retries: 20
-      start_period: 60s
+      start_period: 90s
     deploy:
       resources:
         limits:
           memory: 1G
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
 
   backend:
     build:
@@ -67,6 +71,7 @@ services:
     environment:
       - NODE_ENV=development
       - PORT=5000
+      # Override localhost URLs from secrets.env with Docker service names
       - REDIS_URL=redis://redis:6379
       - ELASTICSEARCH_URL=http://elasticsearch:9200
       - JWT_EXPIRES_IN=7d
@@ -93,8 +98,11 @@ services:
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:5000/api
       - NEXT_PUBLIC_SOCKET_URL=http://localhost:5000
+      # Internal proxy uses Docker service name, not localhost
       - API_PROXY_URL=http://backend:5000/api
+      # Enable polling for file watching on Windows/WSL2/Mac
       - WATCHPACK_POLLING=true
+      - CHOKIDAR_USEPOLLING=true
       - NEXT_TELEMETRY_DISABLED=1
     extra_hosts:
       - "host.docker.internal:host-gateway"

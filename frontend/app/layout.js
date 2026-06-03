@@ -7,6 +7,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import OnboardingModal from '@/components/OnboardingModal';
 import ReportIssueButton from '@/components/ReportIssueButton';
+import NetworkStatus from '@/components/NetworkStatus';
 import DotField from '@/components/DotField';
 import { Toaster } from 'react-hot-toast';
 
@@ -40,6 +41,7 @@ export default function RootLayout({ children }) {
                 <Navbar />
                 <OnboardingModal />
                 <ReportIssueButton />
+                <NetworkStatus />
                 <main className="flex-1">
                   {children}
                 </main>

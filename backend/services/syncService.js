@@ -1,4 +1,9 @@
-const admin = require('firebase-admin');
+let admin = null;
+try {
+  admin = require('firebase-admin');
+} catch (_) {
+  // firebase-admin is optional — if not installed, Firebase user sync is disabled
+}
 const User = require('../models/User');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
@@ -9,6 +14,7 @@ const SYNC_INTERVAL = 30000; // 30 seconds cooldown
 let firebaseAdminApp = null;
 
 const getFirebaseAdmin = () => {
+  if (!admin) return null; // firebase-admin package not installed
   if (firebaseAdminApp) return firebaseAdminApp;
 
   const serviceAccountEnv = process.env.FIREBASE_SERVICE_ACCOUNT;

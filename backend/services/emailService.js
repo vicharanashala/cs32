@@ -286,3 +286,43 @@ exports.sendDoubtSolvedNotification = async (question, answerBody, solverName) =
     console.error('Error sending doubt solved email:', err.message);
   }
 };
+
+/**
+ * Notify user when they are promoted to Moderator or Admin
+ */
+exports.sendRolePromotionEmail = async (user, newRole) => {
+  try {
+    const roleLabel = newRole.charAt(0).toUpperCase() + newRole.slice(1);
+    const htmlContent = `
+      <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="background: linear-gradient(135deg, #8b5cf6, #6366f1); padding: 30px; border-radius: 12px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 24px;">🎉 Congratulations!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">You have been promoted to ${roleLabel}!</p>
+        </div>
+        <div style="padding: 20px; color: #334155; line-height: 1.6;">
+          <p>Hi <strong>${user.displayName || user.username}</strong>,</p>
+          <p>We are excited to inform you that your role on **PrashnaSārathi** has been elevated to <strong>${roleLabel}</strong>.</p>
+          
+          <p>This promotion is in recognition of your positive contributions and helpful presence within our community. As a ${roleLabel}, you now have access to special moderation and administration capabilities to help keep our platform healthy and structured.</p>
+          
+          <div style="text-align: center; margin-top: 30px;">
+            <a href="${process.env.CLIENT_URL || 'http://localhost:3000'}" style="background-color: #6366f1; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Explore Your Privileges</a>
+          </div>
+        </div>
+        <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
+          <p>Sent with respect by PrashnaSārathi Team</p>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `PrashnaSārathi <${SENDER_EMAIL}>`,
+      to: user.email,
+      subject: `🎉 Account Upgrade: Promoted to ${roleLabel}!`,
+      html: htmlContent
+    });
+  } catch (err) {
+    console.error('Error sending role promotion email:', err.message);
+  }
+};
+

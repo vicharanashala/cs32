@@ -318,6 +318,23 @@ Medium-Impact Quality of Life
 
 ### Recent Fixes
 
+#### Latest Fixes (June 3, 2026)
+
+1. **Role Promotion Email Notifications**
+   * *Resolution*: Implemented `sendRolePromotionEmail` in `emailService.js` and hooked it into `updateUserRole` in `adminController.js` to automatically notify users when promoted to moderator or admin.
+
+2. **Moderators Directory Tab**
+   * *Resolution*: Added a new "Moderation Team" tab to the Community page (`frontend/app/users/page.js`) that lists all active moderators and admins. Implemented a corresponding `/api/users/moderators` endpoint on the backend.
+
+3. **Low Network Connectivity Alerts**
+   * *Resolution*: Built a global `NetworkStatus` banner component (`frontend/components/NetworkStatus.js`) that monitors the Network Information API and response latencies to notify users when network connectivity is slow ("The network in your area is low. Please be patient or move to an area with good network.") or offline.
+
+4. **FAQ Recommendation Engine Overhaul**
+   * *Resolution*: Refined the recommendation service to use flexible keyword-based matching for user phases, redesigned the `RecommendedFAQs` modal to show contextual labels, and updated `faqController.js` with dynamic Redis caching TTLs (guest bypass, 10m for no-phase users, 30m for phased users).
+
+5. **Docker Platform-Agnostic Stability**
+   * *Resolution*: Configured volume compatibility, disabled Elasticsearch memory lock for Windows/macOS, enabled polling for Next.js hot-reloads, and fixed `docker-entrypoint.sh` crash loops on Atlas MongoDB connectivity.
+
 #### Latest Fixes (June 2, 2026)
 
 1. **Firebase Admin User Synchronization & Real-time Pruning**

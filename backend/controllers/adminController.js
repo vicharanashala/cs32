@@ -76,6 +76,17 @@ exports.updateUserRole = async (req, res, next) => {
     }
     const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-password');
     if (!user) throw new AppError('User not found', 404);
+
+    // If promoted to moderator or admin, send email notification
+    if (role === 'moderator' || role === 'admin') {
+      try {
+        const { sendRolePromotionEmail } = require('../services/emailService');
+        await sendRolePromotionEmail(user, role);
+      } catch (emailErr) {
+        console.error('Failed to send promotion email:', emailErr.message);
+      }
+    }
+
     res.json({ user });
   } catch (err) {
     next(err);
