@@ -320,7 +320,13 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 3, 2026)
 
-1. **Admin Panel Lazy-Loading Optimization**
+1. **Fixed Admin Panel Stuck Loading State**
+   * *Resolution*: Resolved a bug where lazy-loading tabs on the Admin Panel (`frontend/app/admin/page.js`) did not update the `loading` state to `false` for the default dashboard tab, causing the page to remain stuck in a loading animation. Wrapped the tab fetches in a central async runner that manages the loading state correctly.
+
+2. **Added Firebase Service Account Credentials**
+   * *Resolution*: Populated the `FIREBASE_SERVICE_ACCOUNT` environment variable in `secrets.env` with the full service account JSON in a single line as requested, enabling the Firebase Admin SDK synchronization module.
+
+3. **Admin Panel Lazy-Loading Optimization**
    * *Resolution*: Refactored the Admin Panel (`frontend/app/admin/page.js`) to lazy-load tab data only when the tab becomes active. Socket.IO `moderation:updated` events now only trigger a re-fetch of the currently active tab, dramatically improving page responsiveness and reducing network traffic.
 
 2. **Resolved Missing Site Reports Resolution Handler**
