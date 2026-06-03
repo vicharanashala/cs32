@@ -20,6 +20,14 @@ router.post('/reports', auth, ctrl.createSiteReport);
 router.get('/reports', auth, adminOnly, ctrl.getSiteReports);
 router.post('/reports/:id/resolve', auth, adminOnly, ctrl.resolveSiteReport);
 
+// Email Queue Monitoring & Admin Endpoints
+router.get('/emails/queue', auth, adminOnly, ctrl.getEmailQueue);
+router.post('/emails/process', auth, adminOnly, ctrl.forceProcessQueue);
+router.post('/emails/retry-failed', auth, adminOnly, ctrl.retryFailedEmails);
+router.delete('/emails/queue', auth, adminOnly, ctrl.clearEmailQueue);
+router.get('/emails/bounces', auth, adminOnly, ctrl.getBouncedEmails);
+router.delete('/emails/bounces/:id', auth, adminOnly, ctrl.removeBouncedEmail);
+
 router.post('/questions/:id/convert-to-faq', auth, moderatorOrAdmin, ctrl.convertQuestionToFAQItem);
 
 // Moderation Endpoints

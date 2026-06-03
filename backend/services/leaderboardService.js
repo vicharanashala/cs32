@@ -1,10 +1,8 @@
 const User = require('../models/User');
 const Answer = require('../models/Answer');
 const { getIO } = require('../socket');
-const { syncGoogleUsers } = require('./syncService');
 
 const getLeaderboardData = async () => {
-  await syncGoogleUsers();
   // Primary: users who resolved doubts (accepted answers or solved-my-doubt votes)
   let leaderboard = await Answer.aggregate([
     { $match: { isDeleted: { $ne: true }, status: { $ne: 'deleted' }, $or: [{ isAccepted: true }, { solvedMyDoubtCount: { $gt: 0 } }] } },
@@ -68,21 +66,7 @@ const broadcastLeaderboard = async () => {
     const io = getIO();
     io.emit('leaderboard:update', { leaderboard: data });
 
-    // Handle Top 10 leaderboard email notifications
-    try {
-      const top10 = data.slice(0, 10);
-      const { sendLeaderboardTop10Email } = require('./emailService');
-      for (const row of top10) {
-        if (row.user && row.user.username) {
-          const userObj = await User.findOne({ username: row.user.username });
-          if (userObj && !userObj.receivedTop10Email) {
-            await sendLeaderboardTop10Email(userObj);
-          }
-        }
-      }
-    } catch (top10Err) {
-      console.error('Error handling Top 10 email triggers:', top10Err.message);
-    }
+    // Top 10 email notifications are disabled to prevent non-compliant outbound emails
   } catch (err) {
     // Socket might not be initialized yet during startup/seeding, ignore
     console.log('Socket not ready to broadcast leaderboard update.');

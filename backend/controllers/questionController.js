@@ -130,11 +130,11 @@ exports.createQuestion = async (req, res, next) => {
     if (visibility === 'public') {
       await indexQuestion(populated);
 
-      // Send new question notification email broadcast
+      // Send new question approved notification
       try {
-        const { sendNewQuestionNotification } = require('../services/emailService');
+        const { sendNewQuestionApprovedNotification } = require('../services/emailService');
         const authorName = populated.author ? (populated.author.displayName || populated.author.username) : 'Anonymous';
-        await sendNewQuestionNotification(populated, authorName);
+        await sendNewQuestionApprovedNotification(populated, authorName);
       } catch (emailErr) {
         console.error('Email notification error:', emailErr.message);
       }

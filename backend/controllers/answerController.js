@@ -63,6 +63,14 @@ exports.createAnswer = async (req, res, next) => {
           reference: answer._id,
         });
         emitToUser(question.author.toString(), 'notification:new', { answer: populated });
+
+        // Send email notification to question author
+        try {
+          const { sendAnswerPostedNotification } = require('../services/emailService');
+          await sendAnswerPostedNotification(populated, question);
+        } catch (emailErr) {
+          console.error('Email notification error:', emailErr.message);
+        }
       }
 
       emitToQuestion(question._id.toString(), 'answer:new', { answer: populated });
@@ -261,15 +269,7 @@ exports.acceptAnswer = async (req, res, next) => {
         emitToUser(userId.toString(), 'notification:new', { questionAnswered: true });
       });
 
-      // Send email notifications to "Me Too" users via Nodemailer
-      try {
-        const { sendDoubtSolvedNotification } = require('../services/emailService');
-        const solver = await User.findById(answer.author);
-        const solverName = solver ? (solver.displayName || solver.username) : 'A community peer';
-        await sendDoubtSolvedNotification(question, answer.body, solverName);
-      } catch (emailErr) {
-        console.error('Email notification error:', emailErr.message);
-      }
+      // Doubt solved email notifications are disabled to prevent non-compliant outbound emails
     }
 
     await broadcastLeaderboard();

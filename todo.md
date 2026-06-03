@@ -320,8 +320,22 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 3, 2026)
 
-1. **Fixed Admin Panel Stuck Loading State**
-   * *Resolution*: Resolved a bug where lazy-loading tabs on the Admin Panel (`frontend/app/admin/page.js`) did not update the `loading` state to `false` for the default dashboard tab, causing the page to remain stuck in a loading animation. Wrapped the tab fetches in a central async runner that manages the loading state correctly.
+1. **Email Queue Worker — Module Resolution & Docker Volume Fix**
+   * *Resolution*: `node-cron` module was missing from the backend Docker container's anonymous `node_modules` volume (old volume predated the new dependency). Installed `node-cron` directly into the live container via `docker exec -u root` and rebuilt the backend image so future containers have it baked in. The `[EmailWorker]` now initialises cleanly at startup.
+
+2. **Firebase Admin SDK — Robust JSON Parsing in .env**
+   * *Resolution*: `FIREBASE_SERVICE_ACCOUNT` stored as a single-line JSON string in `secrets.env` had double-escaped quotes (`\"`) and newlines (`\\n`) that broke `JSON.parse`. Updated `backend/services/syncService.js` to unwrap outer quotes, unescape `\"`, and convert `\\n` to real newlines before parsing. Firebase Admin SDK now initialises successfully on every startup.
+
+3. **Network-Agnostic API & Socket Routing (Critical Fix)**
+   * *Resolution*: `frontend/lib/api.js` was hardcoded to `http://localhost:5000/api`, meaning API calls from any external device or mobile phone would fail (browser's `localhost` ≠ server). Changed to use a relative `/api` path in the browser so all requests route through the Next.js server proxy (`next.config.js` rewrites), which then forwards to the backend container. Same fix applied to Socket.IO in `frontend/context/SocketContext.js` (passes `''` as the URL, connecting to the current origin). Added a `/socket.io/:path*` proxy rewrite to `next.config.js` to transparently proxy WebSocket handshakes.
+
+4. **Leaderboard Load-Time Eliminated (Critical Performance)**
+   * *Resolution*: `getLeaderboardData()` in `backend/services/leaderboardService.js` was calling `await syncGoogleUsers()` blocking the read path on every leaderboard fetch. This caused multi-second delays for every leaderboard load and live broadcast. Removed the blocking call — Firebase user sync continues to run on its own 10-minute background interval via `server.js` and is unrelated to reading leaderboard data.
+
+5. **Admin Email Queue Tab — Full Integration**
+   * *Resolution*: Implemented the "Emails" monitoring tab in the Admin Panel with live stats (pending, sent today, bounced), a paginated queue log, bounce list management, and four action buttons (Force Process, Retry Failed, Clear Queue, Remove Bounce) all wired to the corresponding `/api/admin/emails/*` endpoints. Fixed a `params` wrapper bug in `fetchEmails()` that was preventing the queue list from loading.
+
+
 
 2. **Added Firebase Service Account Credentials**
    * *Resolution*: Populated the `FIREBASE_SERVICE_ACCOUNT` environment variable in `secrets.env` with the full service account JSON in a single line as requested, enabling the Firebase Admin SDK synchronization module.

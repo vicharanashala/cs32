@@ -24,9 +24,17 @@ const getFirebaseAdmin = () => {
 
   try {
     let serviceAccount;
-    const trimmed = serviceAccountEnv.trim();
+    let trimmed = serviceAccountEnv.trim();
+    if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+      trimmed = trimmed.slice(1, -1);
+    }
+    trimmed = trimmed.replace(/\\"/g, '"');
+
     if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
       serviceAccount = JSON.parse(trimmed);
+      if (serviceAccount.private_key) {
+        serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+      }
     } else {
       serviceAccount = require(trimmed);
     }

@@ -36,16 +36,6 @@ exports.getGlobalFAQAnalytics = async (req, res, next) => {
 
 exports.getUsers = async (req, res, next) => {
   try {
-    try {
-      const { syncGoogleUsers } = require('../services/syncService');
-      // Execute syncGoogleUsers in the background to avoid blocking the request
-      syncGoogleUsers().catch(syncErr => {
-        console.error('Failed to sync Google users in background:', syncErr.message);
-      });
-    } catch (syncErr) {
-      console.error('Failed to require/invoke syncGoogleUsers:', syncErr.message);
-    }
-
     const { page, limit, skip } = paginate(req.query.page, req.query.limit);
     const filter = {};
     if (req.query.role) filter.role = req.query.role;
@@ -81,15 +71,7 @@ exports.updateUserRole = async (req, res, next) => {
     const user = await User.findByIdAndUpdate(req.params.id, { role }, { new: true }).select('-password');
     if (!user) throw new AppError('User not found', 404);
 
-    // If promoted to moderator or admin, send email notification
-    if (role === 'moderator' || role === 'admin') {
-      try {
-        const { sendRolePromotionEmail } = require('../services/emailService');
-        await sendRolePromotionEmail(user, role);
-      } catch (emailErr) {
-        console.error('Failed to send promotion email:', emailErr.message);
-      }
-    }
+    // Role promotion emails are disabled to prevent non-compliant outbound emails
 
     try {
       const { emitToAdmin } = require('../socket');
@@ -129,6 +111,16 @@ exports.banUser = async (req, res, next) => {
 exports.unbanUser = async (req, res, next) => {
   try {
     await unbanUser(req.params.id);
+
+    try {
+      const targetUser = await User.findById(req.params.id);
+      if (targetUser && targetUser.email) {
+        const { sendUserUnblockedNotification } = require('../services/emailService');
+        await sendUserUnblockedNotification(targetUser);
+      }
+    } catch (emailErr) {
+      console.error('Failed to send unblocked email:', emailErr.message);
+    }
 
     try {
       const { emitToAdmin } = require('../socket');
@@ -523,9 +515,9 @@ exports.approvePost = async (req, res, next) => {
 
       // Email notification
       try {
-        const { sendNewQuestionNotification } = require('../services/emailService');
+        const { sendNewQuestionApprovedNotification } = require('../services/emailService');
         const authorName = populated.author ? (populated.author.displayName || populated.author.username) : 'Anonymous';
-        await sendNewQuestionNotification(populated, authorName);
+        await sendNewQuestionApprovedNotification(populated, authorName);
       } catch (emailErr) {
         console.error('Email notification error:', emailErr.message);
       }
@@ -553,6 +545,14 @@ exports.approvePost = async (req, res, next) => {
             reference: post._id,
           });
           emitToUser(q.author.toString(), 'notification:new', { answer: populated });
+
+          // Send email notification to question author
+          try {
+            const { sendAnswerPostedNotification } = require('../services/emailService');
+            await sendAnswerPostedNotification(populated, q);
+          } catch (emailErr) {
+            console.error('Email notification error:', emailErr.message);
+          }
         }
         emitToQuestion(q._id.toString(), 'answer:new', { answer: populated });
       }
@@ -600,17 +600,7 @@ exports.rejectPost = async (req, res, next) => {
     post.isDeleted = true; // Mark as deleted so it won't appear
     await post.save();
 
-    // Send post rejection email notification
-    try {
-      const author = await User.findById(post.author);
-      if (author && author.email) {
-        const { sendPostRejectionEmail } = require('../services/emailService');
-        const previewText = postType === 'Question' ? post.title : post.body;
-        await sendPostRejectionEmail(author, postType, previewText, reason);
-      }
-    } catch (emailErr) {
-      console.error('Failed to send rejection email:', emailErr.message);
-    }
+    // Post rejection emails are disabled to prevent non-compliant outbound emails
 
     // Audit Log
     await AuditLog.create({
@@ -710,14 +700,14 @@ exports.moderateUser = async (req, res, next) => {
 
     await targetUser.save();
 
-    // Send user sanction email notification
+    // Send user blocked email notification only if blocked
     try {
-      if (targetUser.email) {
-        const { sendUserSanctionEmail } = require('../services/emailService');
-        await sendUserSanctionEmail(targetUser, action, reason, targetUser.suspendedUntil);
+      if (targetUser.email && action === 'block') {
+        const { sendUserBlockedNotification } = require('../services/emailService');
+        await sendUserBlockedNotification(targetUser, reason);
       }
     } catch (emailErr) {
-      console.error('Failed to send sanction email:', emailErr.message);
+      console.error('Failed to send block email:', emailErr.message);
     }
 
     // Audit Log
@@ -763,6 +753,115 @@ exports.getAuditLogs = async (req, res, next) => {
       .populate('adminId', 'username displayName')
       .sort({ timestamp: -1 });
     res.json({ logs });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getEmailQueue = async (req, res, next) => {
+  try {
+    const EmailQueue = require('../models/EmailQueue');
+    const BouncedEmail = require('../models/BouncedEmail');
+    const EmailStat = require('../models/EmailStat');
+
+    const { page = 1, limit = 20 } = req.query;
+    const skip = (page - 1) * limit;
+
+    const [emails, total] = await Promise.all([
+      EmailQueue.find()
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit))
+        .lean(),
+      EmailQueue.countDocuments()
+    ]);
+
+    // Real-time queue counters
+    const today = new Date().toISOString().split('T')[0];
+    const todayStat = await EmailStat.findOne({ date: today });
+    const sentToday = todayStat ? todayStat.count : 0;
+
+    const [pendingCount, bouncedCount] = await Promise.all([
+      EmailQueue.countDocuments({ status: 'pending' }),
+      EmailQueue.countDocuments({ status: 'bounced' })
+    ]);
+
+    res.json({
+      emails,
+      pagination: {
+        page: parseInt(page),
+        limit: parseInt(limit),
+        total,
+        pages: Math.ceil(total / limit)
+      },
+      stats: {
+        pendingCount,
+        sentToday,
+        bouncedCount
+      }
+    });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.forceProcessQueue = async (req, res, next) => {
+  try {
+    const { processEmailQueue } = require('../services/emailWorker');
+    // Run asynchronously, don't wait to complete
+    processEmailQueue().catch(err => console.error('Force process queue error:', err.message));
+    res.json({ message: 'Queue processing started in background' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.retryFailedEmails = async (req, res, next) => {
+  try {
+    const EmailQueue = require('../models/EmailQueue');
+    const result = await EmailQueue.updateMany(
+      { status: { $in: ['failed', 'bounced'] } },
+      {
+        $set: {
+          status: 'pending',
+          attempts: 0,
+          nextRetryAt: new Date(),
+          failReason: null
+        }
+      }
+    );
+    res.json({ message: `Successfully reset ${result.modifiedCount || result.nModified || 0} failed/bounced email(s) to pending` });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.clearEmailQueue = async (req, res, next) => {
+  try {
+    const EmailQueue = require('../models/EmailQueue');
+    await EmailQueue.deleteMany({});
+    res.json({ message: 'Email queue cleared successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getBouncedEmails = async (req, res, next) => {
+  try {
+    const BouncedEmail = require('../models/BouncedEmail');
+    const bounces = await BouncedEmail.find().sort({ bouncedAt: -1 }).lean();
+    res.json({ bounces });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.removeBouncedEmail = async (req, res, next) => {
+  try {
+    const BouncedEmail = require('../models/BouncedEmail');
+    const result = await BouncedEmail.findByIdAndDelete(req.params.id);
+    if (!result) throw new AppError('Bounce record not found', 404);
+    res.json({ message: 'Bounce record removed successfully' });
   } catch (err) {
     next(err);
   }

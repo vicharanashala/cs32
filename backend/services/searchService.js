@@ -715,6 +715,23 @@ const seedDatabase = async () => {
     const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
     const faqItems = JSON.parse(fs.readFileSync(faqsPath, 'utf-8'));
 
+    const Category = require('../models/Category');
+    const existingCategories = await Category.countDocuments();
+    if (existingCategories === 0) {
+      console.log('Seeding categories...');
+      const categoriesToSeed = [];
+      let orderIndex = 0;
+      for (const [catId, catName] of Object.entries(metadata.categories)) {
+        categoriesToSeed.push({
+          name: catName,
+          icon: '📌',
+          order: orderIndex++,
+        });
+      }
+      await Category.insertMany(categoriesToSeed);
+      console.log('Categories seeded successfully');
+    }
+
     const existingFaqs = await FAQ.countDocuments();
     if (existingFaqs === 0) {
       console.log('Seeding database...');

@@ -9,6 +9,7 @@ const FAQ = require('../models/FAQ');
 const Question = require('../models/Question');
 const Answer = require('../models/Answer');
 const Tag = require('../models/Tag');
+const Category = require('../models/Category');
 
 const slugify = (text) =>
   text
@@ -68,7 +69,21 @@ const seed = async () => {
       Question.deleteMany({}),
       Answer.deleteMany({}),
       Tag.deleteMany({}),
+      Category.deleteMany({}),
     ]);
+
+    console.log('Seeding categories...');
+    const categoriesToSeed = [];
+    let orderIndex = 0;
+    for (const [catId, catName] of Object.entries(metadata.categories)) {
+      categoriesToSeed.push({
+        name: catName,
+        icon: '📌',
+        order: orderIndex++,
+      });
+    }
+    await Category.insertMany(categoriesToSeed);
+    console.log('Categories seeded successfully');
 
     // Keep real users (who registered via normal signup or Google sign-in)
     // We only delete users who are part of our previous mock users list or duplicate admins.

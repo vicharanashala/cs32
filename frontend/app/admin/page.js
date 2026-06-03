@@ -31,6 +31,13 @@ export default function AdminPage() {
   const [suspiciousActivities, setSuspiciousActivities] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
 
+  // Email System States
+  const [emails, setEmails] = useState([]);
+  const [emailStats, setEmailStats] = useState({ pendingCount: 0, sentToday: 0, bouncedCount: 0 });
+  const [emailPage, setEmailPage] = useState(1);
+  const [emailPagination, setEmailPagination] = useState({ page: 1, pages: 1 });
+  const [bounces, setBounces] = useState([]);
+
   useEffect(() => {
     if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
       router.push('/');
@@ -58,6 +65,8 @@ export default function AdminPage() {
           await fetchAuditLogs();
         } else if (tab === 'siteReports' && user.role === 'admin') {
           await fetchSiteReports();
+        } else if (tab === 'emails' && user.role === 'admin') {
+          await Promise.all([fetchEmails(), fetchBounces()]);
         }
       } catch (err) {
         console.error("Error loading admin data:", err);
@@ -90,8 +99,9 @@ export default function AdminPage() {
         fetchSuspiciousActivities();
       } else if (tab === 'auditLogs') {
         fetchAuditLogs();
-      } else if (tab === 'siteReports' && user?.role === 'admin') {
-        fetchSiteReports();
+      } else if (tab === 'emails' && user?.role === 'admin') {
+        fetchEmails();
+        fetchBounces();
       }
     };
     socket.on('moderation:updated', handleModerationUpdate);
@@ -101,10 +111,79 @@ export default function AdminPage() {
   }, [socket, user, tab]);
 
   useEffect(() => {
+    if (tab === 'emails' && user?.role === 'admin') {
+      fetchEmails();
+    }
+  }, [emailPage]);
+
+  const fetchEmails = async () => {
+    try {
+      const data = await api.get('/admin/emails/queue', { page: emailPage, limit: 15 });
+      setEmails(data.emails || []);
+      setEmailStats(data.stats || { pendingCount: 0, sentToday: 0, bouncedCount: 0 });
+      setEmailPagination(data.pagination || { page: 1, pages: 1 });
+    } catch (err) {
+      console.error('Failed to fetch email queue:', err);
+    }
+  };
+
+  const fetchBounces = async () => {
+    try {
+      const data = await api.get('/admin/emails/bounces');
+      setBounces(data.bounces || []);
+    } catch (err) {
+      console.error('Failed to fetch bounces:', err);
+    }
+  };
+
+  const handleForceProcessQueue = async () => {
+    try {
+      await api.post('/admin/emails/process');
+      toast.success('Queue processing triggered in background');
+      setTimeout(fetchEmails, 1000);
+    } catch (err) {
+      toast.error(err.message || 'Failed to trigger queue processing');
+    }
+  };
+
+  const handleRetryFailed = async () => {
+    try {
+      const res = await api.post('/admin/emails/retry-failed');
+      toast.success(res.message || 'Failed/bounced emails reset to pending');
+      fetchEmails();
+    } catch (err) {
+      toast.error(err.message || 'Failed to reset emails');
+    }
+  };
+
+  const handleClearQueue = async () => {
+    if (!confirm('Are you sure you want to permanently delete all emails in the queue?')) return;
+    try {
+      await api.delete('/admin/emails/queue');
+      toast.success('Email queue cleared');
+      fetchEmails();
+    } catch (err) {
+      toast.error(err.message || 'Failed to clear queue');
+    }
+  };
+
+  const handleRemoveBounce = async (id) => {
+    try {
+      await api.delete(`/admin/emails/bounces/${id}`);
+      toast.success('Bounce record removed');
+      fetchBounces();
+      fetchEmails();
+    } catch (err) {
+      toast.error(err.message || 'Failed to remove bounce record');
+    }
+  };
+
+  useEffect(() => {
     if (user && (user.role === 'admin' || user.role === 'moderator')) {
       fetchAnomalies();
     }
   }, [anomalySeverityFilter, anomalyStatusFilter, anomalySortBy, anomalyPage]);
+
   const fetchDashboard = async () => {
     try {
       const data = await api.get('/admin/dashboard');
@@ -294,7 +373,7 @@ export default function AdminPage() {
     tabs.push('moderationQueue', 'reportedPosts', 'suspiciousActivities', 'auditLogs');
   }
   if (user?.role === 'admin') {
-    tabs.push('siteReports');
+    tabs.push('siteReports', 'emails');
   }
   if (user?.role !== 'admin') {
     const uIdx = tabs.indexOf('users');
@@ -322,6 +401,7 @@ export default function AdminPage() {
              t === 'suspiciousActivities' ? 'Suspicious Activity' :
              t === 'auditLogs' ? 'Audit Logs' :
              t === 'siteReports' ? 'Site Reports' :
+             t === 'emails' ? 'Email Queue' :
              t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
@@ -1091,6 +1171,183 @@ export default function AdminPage() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      ) : tab === 'emails' ? (
+        <div className="space-y-6">
+          <div className="card p-5 bg-gradient-to-r from-indigo-500/5 to-cyan-500/5 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div>
+              <h3 className="font-bold text-lg text-[var(--color-text)]">Email Notification System</h3>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                Monitor the outbound queue, view statistics, force processing, and manage permanent bounces.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={handleForceProcessQueue}
+                className="btn-primary btn-sm px-4 py-2 font-semibold text-xs rounded-lg shadow-sm"
+              >
+                ⚡ Force Process Queue
+              </button>
+              <button
+                onClick={handleRetryFailed}
+                className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold text-xs rounded-lg shadow-sm"
+              >
+                🔄 Retry Failed/Bounced
+              </button>
+              <button
+                onClick={handleClearQueue}
+                className="px-4 py-2 border border-red-500 hover:bg-red-500/10 text-red-500 font-semibold text-xs rounded-lg shadow-sm"
+              >
+                🗑️ Clear Queue
+              </button>
+            </div>
+          </div>
+
+          {/* Stat Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card p-4 border-l-4 border-indigo-500 bg-indigo-500/5">
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Pending Queue</p>
+              <p className="text-3xl font-extrabold text-indigo-600 dark:text-indigo-400 mt-1">
+                {emailStats.pendingCount}
+              </p>
+            </div>
+            <div className="card p-4 border-l-4 border-emerald-500 bg-emerald-500/5">
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Sent Today (Limit 450)</p>
+              <p className="text-3xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-1">
+                {emailStats.sentToday} / 450
+              </p>
+            </div>
+            <div className="card p-4 border-l-4 border-rose-500 bg-rose-500/5">
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Bounced Total</p>
+              <p className="text-3xl font-extrabold text-rose-600 dark:text-rose-400 mt-1">
+                {emailStats.bouncedCount}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Email Queue Section */}
+            <div className="card lg:col-span-2 overflow-hidden flex flex-col justify-between">
+              <div>
+                <div className="p-4 border-b border-[var(--color-border)]">
+                  <h4 className="font-bold text-[var(--color-text)] text-sm">Active Queue Logs</h4>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm text-left">
+                    <thead>
+                      <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
+                        <th className="px-4 py-2.5 font-semibold text-[var(--color-text)]">To</th>
+                        <th className="px-4 py-2.5 font-semibold text-[var(--color-text)]">Subject</th>
+                        <th className="px-4 py-2.5 font-semibold text-[var(--color-text)]">Status</th>
+                        <th className="px-4 py-2.5 font-semibold text-[var(--color-text)] text-center">Attempts</th>
+                        <th className="px-4 py-2.5 font-semibold text-[var(--color-text)]">Next Retry At</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-[var(--color-border)]">
+                      {emails.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="text-center p-8 text-[var(--color-text-secondary)]">
+                            No emails in queue.
+                          </td>
+                        </tr>
+                      ) : (
+                        emails.map(email => (
+                          <tr key={email._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30 text-xs">
+                            <td className="px-4 py-3">
+                              <p className="font-medium text-[var(--color-text)]">{email.userName}</p>
+                              <p className="text-[var(--color-text-secondary)]">{email.to}</p>
+                            </td>
+                            <td className="px-4 py-3 max-w-xs truncate" title={email.subject}>
+                              {email.subject}
+                              {email.failReason && (
+                                <p className="text-[10px] text-red-500 font-medium mt-0.5 truncate" title={email.failReason}>
+                                  Err: {email.failReason}
+                                </p>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold ${
+                                email.status === 'sent' ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
+                                email.status === 'pending' ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 animate-pulse' :
+                                email.status === 'bounced' ? 'bg-rose-500/10 text-rose-600 dark:text-rose-400' :
+                                'bg-gray-500/10 text-gray-600 dark:text-gray-400'
+                              }`}>
+                                {email.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-center text-[var(--color-text-secondary)]">
+                              {email.attempts} / {email.maxAttempts}
+                            </td>
+                            <td className="px-4 py-3 text-[var(--color-text-secondary)] text-[10px]">
+                              {email.status === 'pending' ? formatDate(email.nextRetryAt) : 'N/A'}
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              {emailPagination.pages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)]">
+                  <button
+                    onClick={() => setEmailPage(p => Math.max(1, p - 1))}
+                    disabled={emailPage === 1}
+                    className="btn-secondary btn-sm disabled:opacity-50 text-xs px-2.5 py-1"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    Page {emailPage} of {emailPagination.pages}
+                  </span>
+                  <button
+                    onClick={() => setEmailPage(p => Math.min(emailPagination.pages, p + 1))}
+                    disabled={emailPage === emailPagination.pages}
+                    className="btn-secondary btn-sm disabled:opacity-50 text-xs px-2.5 py-1"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* Bounces Sidebar */}
+            <div className="card overflow-hidden">
+              <div className="p-4 border-b border-[var(--color-border)]">
+                <h4 className="font-bold text-[var(--color-text)] text-sm">Permanent Bounces ({bounces.length})</h4>
+              </div>
+              <div className="divide-y divide-[var(--color-border)] max-h-[400px] overflow-y-auto">
+                {bounces.length === 0 ? (
+                  <p className="p-4 text-xs text-center text-[var(--color-text-secondary)]">
+                    No permanent bounces registered.
+                  </p>
+                ) : (
+                  bounces.map(b => (
+                    <div key={b._id} className="p-3 hover:bg-gray-50 dark:hover:bg-gray-800/30 flex justify-between items-start gap-2 text-xs">
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-[var(--color-text)] truncate" title={b.email}>
+                          {b.email}
+                        </p>
+                        <p className="text-[10px] text-red-500 truncate mt-0.5" title={b.reason}>
+                          {b.reason || 'Bounced'}
+                        </p>
+                        <p className="text-[9px] text-[var(--color-text-secondary)] mt-1">
+                          Registered: {formatDate(b.bouncedAt)}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleRemoveBounce(b._id)}
+                        className="p-1 hover:bg-rose-500/10 text-rose-500 rounded transition-colors"
+                        title="Remove from bounce list to retry"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       ) : null}

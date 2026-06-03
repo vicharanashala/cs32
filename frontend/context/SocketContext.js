@@ -5,7 +5,9 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
+const SOCKET_URL = typeof window !== 'undefined'
+  ? ''
+  : (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000');
 
 export function SocketProvider({ children }) {
   const { user } = useAuth();

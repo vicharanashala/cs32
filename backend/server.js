@@ -105,6 +105,17 @@ const startServer = async () => {
     // Start Anomaly Auto-Escalation Check Job every 60 seconds
     const { checkAndEscalateAnomalies } = require('./services/anomalyService');
     setInterval(checkAndEscalateAnomalies, 60000);
+
+    // Start Firebase Google user sync on startup and run it every 10 minutes
+    const { syncGoogleUsers } = require('./services/syncService');
+    syncGoogleUsers().catch(err => console.error('Initial Google user sync failed:', err.message));
+    setInterval(() => {
+      syncGoogleUsers().catch(err => console.error('Interval Google user sync failed:', err.message));
+    }, 600000); // 10 minutes
+
+    // Start Nodemailer Queue Worker
+    const { startEmailWorker } = require('./services/emailWorker');
+    startEmailWorker();
   });
 };
 
