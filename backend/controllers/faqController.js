@@ -263,32 +263,24 @@ exports.markFAQHelpful = async (req, res, next) => {
 
 exports.getRecommendedFAQs = async (req, res, next) => {
   try {
-    const { getRecommendedFAQs } = require('../services/recommendationService');
-    const { getRedis } = require('../config/redis');
+    const Question = require('../models/Question');
+    const currentPhase = req.user ? (req.user.currentPhase || 'onboarding') : 'onboarding';
 
-    const isGuest = !req.user && !req.query.userId;
-    const userId = req.user?._id?.toString() || req.query.userId || null;
-    const hasPhase = !!(req.user?.currentPhase);
+    const resolvedQuestions = await Question.find({
+      isFAQ: true,
+      phase: currentPhase,
+      visibility: 'public',
+      isDeleted: { $ne: true }
+    })
+    .populate('author', 'username displayName avatar reputation')
+    .populate('tags', 'name color')
+    .populate({
+      path: 'acceptedAnswer',
+      populate: { path: 'author', select: 'username displayName avatar reputation' }
+    })
+    .sort({ upvotes: -1, createdAt: -1 });
 
-    // Don't cache for guests — always serve fresh trending FAQs
-    if (!isGuest && userId) {
-      const cacheKey = `recommendations:user:${userId}`;
-      const redis = getRedis();
-      const cached = await redis.get(cacheKey).catch(() => null);
-      if (cached) {
-        return res.json({ faqs: JSON.parse(cached), cached: true });
-      }
-
-      const recommendations = await getRecommendedFAQs(userId);
-      // 30 min for users with a phase, 10 min for users without (so they get updated faster after selecting phase)
-      const ttl = hasPhase ? 1800 : 600;
-      await redis.setex(cacheKey, ttl, JSON.stringify(recommendations)).catch(() => {});
-      return res.json({ faqs: recommendations });
-    }
-
-    // Guest: always fresh, no cache
-    const recommendations = await getRecommendedFAQs(null);
-    res.json({ faqs: recommendations });
+    res.json({ faqs: resolvedQuestions });
   } catch (err) {
     next(err);
   }

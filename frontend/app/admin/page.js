@@ -23,6 +23,12 @@ export default function AdminPage() {
   const [anomalyPage, setAnomalyPage] = useState(1);
   const [anomalyPagination, setAnomalyPagination] = useState({ page: 1, pages: 1 });
   const [loading, setLoading] = useState(true);
+
+  const [moderationQueue, setModerationQueue] = useState({ questions: [], answers: [] });
+  const [reportedPosts, setReportedPosts] = useState([]);
+  const [suspiciousActivities, setSuspiciousActivities] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+
   useEffect(() => {
     if (!user || (user.role !== 'admin' && user.role !== 'moderator')) {
       router.push('/');
@@ -33,6 +39,10 @@ export default function AdminPage() {
     fetchFlagged();
     fetchDeepData();
     fetchAnomalies();
+    fetchModerationQueue();
+    fetchReportedPosts();
+    fetchSuspiciousActivities();
+    fetchAuditLogs();
     if (user.role === 'admin') {
       fetchSiteReports();
     }
@@ -157,8 +167,80 @@ export default function AdminPage() {
       toast.success('Cache cleared');
     } catch (err) { toast.error(err.message); }
   };
+
+  const fetchModerationQueue = async () => {
+    try {
+      const data = await api.get('/admin/moderation/queue');
+      setModerationQueue(data || { questions: [], answers: [] });
+    } catch (_) {}
+  };
+
+  const fetchReportedPosts = async () => {
+    try {
+      const data = await api.get('/admin/moderation/reported');
+      setReportedPosts(data.reports || []);
+    } catch (_) {}
+  };
+
+  const fetchSuspiciousActivities = async () => {
+    try {
+      const data = await api.get('/admin/moderation/suspicious');
+      setSuspiciousActivities(data.activities || []);
+    } catch (_) {}
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const data = await api.get('/admin/moderation/audit-logs');
+      setAuditLogs(data.logs || []);
+    } catch (_) {}
+  };
+
+  const handleApprovePost = async (postId, postType) => {
+    try {
+      await api.post('/admin/moderation/approve', { postId, postType });
+      toast.success('Post approved and published successfully');
+      fetchModerationQueue();
+    } catch (err) {
+      toast.error(err.message || 'Failed to approve post');
+    }
+  };
+
+  const handleRejectPost = async (postId, postType) => {
+    const reason = prompt('Please specify a rejection reason:');
+    if (reason === null) return;
+    try {
+      await api.post('/admin/moderation/reject', { postId, postType, reason });
+      toast.success('Post rejected and hidden');
+      fetchModerationQueue();
+    } catch (err) {
+      toast.error(err.message || 'Failed to reject post');
+    }
+  };
+
+  const handleUserAction = async (userId, action) => {
+    const reason = prompt(`Reason for user action "${action}":`);
+    if (reason === null) return;
+    let durationHours = 0;
+    if (action === 'suspend') {
+      const hoursStr = prompt('Suspension duration in hours (default 24):', '24');
+      if (!hoursStr) return;
+      durationHours = parseInt(hoursStr) || 24;
+    }
+    try {
+      await api.post('/admin/moderation/action', { userId, action, durationHours, reason });
+      toast.success(`Successfully applied action "${action}" to user`);
+      fetchReportedPosts();
+      fetchUsers();
+    } catch (err) {
+      toast.error(err.message || 'Failed to moderate user');
+    }
+  };
+
   const tabs = ['dashboard', 'users', 'flagged', 'anomalies'];
-  if (user?.role === 'admin') tabs.push('siteReports');
+  if (user?.role === 'admin') {
+    tabs.push('siteReports', 'moderationQueue', 'reportedPosts', 'suspiciousActivities', 'auditLogs');
+  }
   if (user?.role !== 'admin') {
     const uIdx = tabs.indexOf('users');
     if (uIdx > -1) tabs.splice(uIdx, 1);
@@ -171,16 +253,21 @@ export default function AdminPage() {
           <button onClick={clearCache} className="btn-secondary btn-sm">Clear Cache</button>
         )}
       </div>
-      <div className="flex gap-1 mb-6 border-b border-[var(--color-border)]">
+      <div className="flex gap-1 mb-6 border-b border-[var(--color-border)] overflow-x-auto">
         {tabs.map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium capitalize border-b-2 transition-colors ${
+            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
               tab === t ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
             }`}
           >
-            {t}
+            {t === 'moderationQueue' ? 'Moderation Queue' :
+             t === 'reportedPosts' ? 'Reported Content' :
+             t === 'suspiciousActivities' ? 'Suspicious Activity' :
+             t === 'auditLogs' ? 'Audit Logs' :
+             t === 'siteReports' ? 'Site Reports' :
+             t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
         ))}
       </div>
@@ -635,6 +722,315 @@ export default function AdminPage() {
                           </button>
                         )}
                       </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : tab === 'moderationQueue' ? (
+        <div className="space-y-6">
+          <div className="card p-5 bg-gradient-to-r from-green-500/5 to-blue-500/5">
+            <h3 className="font-bold text-lg text-[var(--color-text)]">Pre-Moderation Queue</h3>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+              Approve or reject posts submitted by new users before they go public.
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <h4 className="font-semibold text-[var(--color-text)] text-sm">Pending Questions ({moderationQueue.questions?.length || 0})</h4>
+            {(!moderationQueue.questions || moderationQueue.questions.length === 0) ? (
+              <div className="card p-4 text-xs text-[var(--color-text-secondary)]">No pending questions.</div>
+            ) : (
+              <div className="grid gap-4">
+                {moderationQueue.questions.map(q => (
+                  <div key={q._id} className="card p-5 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-xs font-semibold px-2 py-0.5 bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded">
+                          Question
+                        </span>
+                        <h4 className="font-bold text-base text-[var(--color-text)] mt-1.5">{q.title}</h4>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprovePost(q._id, 'Question')}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectPost(q._id, 'Question')}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-[var(--color-text-secondary)] line-clamp-3 whitespace-pre-wrap">{q.body}</div>
+                    <div className="flex gap-4 text-[10px] text-[var(--color-text-secondary)] border-t border-[var(--color-border)] pt-2">
+                      <span>By: <span className="font-medium">@{q.author?.username || 'unknown'}</span></span>
+                      <span>Trust Score: <span className="font-medium text-primary-600">{q.author?.trustScore ?? 0}</span></span>
+                      <span>Level: <span className="font-medium text-purple-600 uppercase">{q.author?.trustLevel || 'new'}</span></span>
+                      <span>Date: <span className="font-medium">{formatDate(q.createdAt)}</span></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="space-y-4 pt-4">
+            <h4 className="font-semibold text-[var(--color-text)] text-sm">Pending Answers ({moderationQueue.answers?.length || 0})</h4>
+            {(!moderationQueue.answers || moderationQueue.answers.length === 0) ? (
+              <div className="card p-4 text-xs text-[var(--color-text-secondary)]">No pending answers.</div>
+            ) : (
+              <div className="grid gap-4">
+                {moderationQueue.answers.map(ans => (
+                  <div key={ans._id} className="card p-5 space-y-3">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <span className="text-xs font-semibold px-2 py-0.5 bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 rounded">
+                          Answer
+                        </span>
+                        <p className="text-xs text-[var(--color-text-secondary)] mt-1.5 font-semibold">
+                          On Question: "{ans.question?.title || 'Unknown Question'}"
+                        </p>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleApprovePost(ans._id, 'Answer')}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold"
+                        >
+                          Approve
+                        </button>
+                        <button
+                          onClick={() => handleRejectPost(ans._id, 'Answer')}
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-xs font-semibold"
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs text-[var(--color-text-secondary)] line-clamp-3 whitespace-pre-wrap">{ans.body}</div>
+                    <div className="flex gap-4 text-[10px] text-[var(--color-text-secondary)] border-t border-[var(--color-border)] pt-2">
+                      <span>By: <span className="font-medium">@{ans.author?.username || 'unknown'}</span></span>
+                      <span>Trust Score: <span className="font-medium text-primary-600">{ans.author?.trustScore ?? 0}</span></span>
+                      <span>Level: <span className="font-medium text-purple-600 uppercase">{ans.author?.trustLevel || 'new'}</span></span>
+                      <span>Date: <span className="font-medium">{formatDate(ans.createdAt)}</span></span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : tab === 'reportedPosts' ? (
+        <div className="card overflow-hidden">
+          <div className="p-5 border-b border-[var(--color-border)] bg-gradient-to-r from-red-500/5 to-orange-500/5">
+            <h3 className="font-bold text-lg text-[var(--color-text)]">Community Reports ({reportedPosts.length})</h3>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+              Review posts flagged by the community. Apply restrictions or dismiss reports.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Post Type</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Post Preview</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Author</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Reason</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Flagged By</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Date</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)] text-right">Moderator Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border)]">
+                {reportedPosts.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="text-center p-8 text-[var(--color-text-secondary)]">
+                      No reported content in database.
+                    </td>
+                  </tr>
+                ) : (
+                  reportedPosts.map(rep => {
+                    const postAuthor = rep.postId?.author;
+                    return (
+                      <tr key={rep._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                        <td className="px-4 py-3">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            rep.postType === 'Question' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                          }`}>
+                            {rep.postType}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 max-w-xs truncate" title={rep.postId?.title || rep.postId?.body}>
+                          {rep.postId ? (
+                            rep.postType === 'Question' ? (
+                              <a href={`/questions/${rep.postId._id}`} target="_blank" className="font-semibold hover:underline text-[var(--color-text)]">
+                                {rep.postId.title}
+                              </a>
+                            ) : (
+                              <span className="text-[var(--color-text-secondary)] italic">{rep.postId.body}</span>
+                            )
+                          ) : (
+                            <span className="text-red-500 italic">Deleted / Missing Post</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          {postAuthor ? (
+                            <div>
+                              <p className="font-medium text-[var(--color-text)]">@{postAuthor.username}</p>
+                              <p className="text-[10px] text-[var(--color-text-secondary)]">Score: {postAuthor.trustScore ?? 0} ({postAuthor.trustLevel || 'new'})</p>
+                            </div>
+                          ) : (
+                            <span className="text-[var(--color-text-muted)]">N/A</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="capitalize font-semibold text-red-600 dark:text-red-400 text-xs bg-red-100/30 px-2 py-0.5 rounded">
+                            {rep.reason}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-[var(--color-text-secondary)]">@{rep.reportedBy?.username}</td>
+                        <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">{formatDate(rep.createdAt)}</td>
+                        <td className="px-4 py-3 text-right">
+                          {postAuthor && (
+                            <div className="inline-flex gap-1.5">
+                              <button
+                                onClick={() => handleUserAction(postAuthor._id, 'warn')}
+                                className="px-2 py-1 text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white rounded"
+                              >
+                                Warn
+                              </button>
+                              <button
+                                onClick={() => handleUserAction(postAuthor._id, 'suspend')}
+                                className="px-2 py-1 text-[10px] font-bold bg-orange-500 hover:bg-orange-600 text-white rounded"
+                              >
+                                Suspend
+                              </button>
+                              <button
+                                onClick={() => handleUserAction(postAuthor._id, 'block')}
+                                className="px-2 py-1 text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white rounded"
+                              >
+                                Block
+                              </button>
+                              <button
+                                onClick={() => handleUserAction(postAuthor._id, 'shadow_ban')}
+                                className="px-2 py-1 text-[10px] font-bold bg-purple-600 hover:bg-purple-700 text-white rounded"
+                              >
+                                Shadow Ban
+                              </button>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : tab === 'suspiciousActivities' ? (
+        <div className="card overflow-hidden">
+          <div className="p-5 border-b border-[var(--color-border)] bg-gradient-to-r from-red-500/5 to-amber-500/5">
+            <h3 className="font-bold text-lg text-[var(--color-text)]">Suspicious Activity Logs ({suspiciousActivities.length})</h3>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+              Tracks sybil accounts, duplicate IPs, or matching browser fingerprints.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Type</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Shared Identifier</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Flagged Accounts</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Confidence</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Status</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border)]">
+                {suspiciousActivities.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="text-center p-8 text-[var(--color-text-secondary)]">
+                      No suspicious activity flags detected.
+                    </td>
+                  </tr>
+                ) : (
+                  suspiciousActivities.map(act => (
+                    <tr key={act._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                      <td className="px-4 py-3">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 capitalize">
+                          {act.activityType}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--color-text)]">{act.sharedValue}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {act.affectedUsers?.map(usr => (
+                            <span key={usr._id} className="text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border)] px-1.5 py-0.5 rounded text-[var(--color-text-secondary)]">
+                              @{usr.username}
+                            </span>
+                          ))}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 font-medium text-[var(--color-text)]">{act.confidenceScore}%</td>
+                      <td className="px-4 py-3">
+                        {act.isResolved ? (
+                          <span className="badge-green">Resolved</span>
+                        ) : (
+                          <span className="badge-red">Unresolved</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">{formatDate(act.flagDate)}</td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : tab === 'auditLogs' ? (
+        <div className="card overflow-hidden">
+          <div className="p-5 border-b border-[var(--color-border)] bg-gray-50 dark:bg-gray-800/20">
+            <h3 className="font-bold text-lg text-[var(--color-text)]">Moderation Audit Logs ({auditLogs.length})</h3>
+            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+              History of all manual moderator and administrator actions for safety review.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead>
+                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Moderator</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Action</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Target Type</th>
+                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Reason / Note</th>
+                  <th className="px-4 py-3 font-semibold text(--color-text)">Date</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--color-border)]">
+                {auditLogs.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="text-center p-8 text-[var(--color-text-secondary)]">
+                      No administrative logs found.
+                    </td>
+                  </tr>
+                ) : (
+                  auditLogs.map(log => (
+                    <tr key={log._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                      <td className="px-4 py-3 font-medium text-[var(--color-text)]">
+                        {log.adminId ? `@${log.adminId.username}` : 'System'}
+                      </td>
+                      <td className="px-4 py-3 font-semibold text-xs capitalize text-[var(--color-text-secondary)]">{log.action.replace('_', ' ')}</td>
+                      <td className="px-4 py-3 font-mono text-xs">{log.targetType}</td>
+                      <td className="px-4 py-3 text-[var(--color-text-secondary)]">{log.reason}</td>
+                      <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">{formatDate(log.timestamp)}</td>
                     </tr>
                   ))
                 )}

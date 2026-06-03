@@ -390,4 +390,254 @@ exports.convertQuestionToFAQItem = async (req, res, next) => {
   }
 };
 
+// Admin Moderation Methods
+exports.getModerationQueue = async (req, res, next) => {
+  try {
+    const questions = await Question.find({ visibility: 'pending', isDeleted: { $ne: true } })
+      .populate('author', 'username displayName trustLevel trustScore');
+    const answers = await Answer.find({ visibility: 'pending', isDeleted: { $ne: true } })
+      .populate('author', 'username displayName trustLevel trustScore')
+      .populate({ path: 'question', select: 'title' });
+    res.json({ questions, answers });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.approvePost = async (req, res, next) => {
+  try {
+    const { postId, postType } = req.body;
+    const AuditLog = require('../models/AuditLog');
+    const { indexQuestion } = require('../services/searchService');
+
+    let post;
+    if (postType === 'Question') {
+      post = await Question.findById(postId);
+    } else {
+      post = await Answer.findById(postId);
+    }
+
+    if (!post) throw new AppError('Post not found', 404);
+
+    post.visibility = 'public';
+    await post.save();
+
+    // Mark user pre-moderation approved
+    const author = await User.findById(post.author);
+    if (author) {
+      author.premodApproved = true;
+      await author.save();
+    }
+
+    // Trigger side-effects since it's now public
+    if (postType === 'Question') {
+      const populated = await Question.findById(post._id)
+        .populate('author', 'username displayName avatar reputation')
+        .populate('tags', 'name color')
+        .populate('relatedQuestions', 'title answerCount');
+      await indexQuestion(populated);
+
+      // Email notification
+      try {
+        const { sendNewQuestionNotification } = require('../services/emailService');
+        const authorName = populated.author ? (populated.author.displayName || populated.author.username) : 'Anonymous';
+        await sendNewQuestionNotification(populated, authorName);
+      } catch (emailErr) {
+        console.error('Email notification error:', emailErr.message);
+      }
+    } else {
+      const q = await Question.findById(post.question);
+      if (q) {
+        q.answerCount += 1;
+        q.lastActivity = new Date();
+        await q.save();
+
+        const populated = await Answer.findById(post._id)
+          .populate('author', 'username displayName avatar reputation');
+
+        const { emitToQuestion, emitToUser } = require('../socket');
+        const Notification = require('../models/Notification');
+
+        if (q.author.toString() !== post.author.toString()) {
+          await Notification.create({
+            recipient: q.author,
+            type: 'new_answer',
+            title: 'New answer on your question',
+            message: `${author.displayName || author.username} answered "${q.title}"`,
+            link: `/questions/${q._id}`,
+            referenceType: 'Answer',
+            reference: post._id,
+          });
+          emitToUser(q.author.toString(), 'notification:new', { answer: populated });
+        }
+        emitToQuestion(q._id.toString(), 'answer:new', { answer: populated });
+      }
+    }
+
+    // Audit Log
+    await AuditLog.create({
+      adminId: req.user._id,
+      action: 'approve_post',
+      targetId: post._id,
+      targetType: postType,
+      reason: 'Approved from pre-moderation queue'
+    });
+
+    res.json({ message: 'Post approved successfully', post });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.rejectPost = async (req, res, next) => {
+  try {
+    const { postId, postType, reason } = req.body;
+    const AuditLog = require('../models/AuditLog');
+
+    let post;
+    if (postType === 'Question') {
+      post = await Question.findById(postId);
+    } else {
+      post = await Answer.findById(postId);
+    }
+
+    if (!post) throw new AppError('Post not found', 404);
+
+    post.visibility = 'hidden';
+    post.isDeleted = true; // Mark as deleted so it won't appear
+    await post.save();
+
+    // Send post rejection email notification
+    try {
+      const author = await User.findById(post.author);
+      if (author && author.email) {
+        const { sendPostRejectionEmail } = require('../services/emailService');
+        const previewText = postType === 'Question' ? post.title : post.body;
+        await sendPostRejectionEmail(author, postType, previewText, reason);
+      }
+    } catch (emailErr) {
+      console.error('Failed to send rejection email:', emailErr.message);
+    }
+
+    // Audit Log
+    await AuditLog.create({
+      adminId: req.user._id,
+      action: 'reject_post',
+      targetId: post._id,
+      targetType: postType,
+      reason: reason || 'Rejected from pre-moderation queue'
+    });
+
+    res.json({ message: 'Post rejected and hidden successfully' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getReportedPosts = async (req, res, next) => {
+  try {
+    const Report = require('../models/Report');
+    const reports = await Report.find()
+      .populate('reportedBy', 'username displayName')
+      .populate({
+        path: 'postId',
+        populate: { path: 'author', select: 'username displayName' }
+      })
+      .sort({ createdAt: -1 });
+    res.json({ reports });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.moderateUser = async (req, res, next) => {
+  try {
+    const { userId, action, durationHours, reason } = req.body;
+    const AuditLog = require('../models/AuditLog');
+
+    const targetUser = await User.findById(userId);
+    if (!targetUser) throw new AppError('User not found', 404);
+
+    if (action === 'warn') {
+      targetUser.status = 'warned';
+      targetUser.violationCount += 1;
+    } else if (action === 'suspend') {
+      targetUser.status = 'suspended';
+      targetUser.violationCount += 1;
+      const hours = durationHours ? parseInt(durationHours) : 24;
+      targetUser.suspendedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
+    } else if (action === 'block') {
+      targetUser.status = 'blocked';
+      // Hide all posts
+      await Question.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+      await Answer.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+    } else if (action === 'shadow_ban') {
+      targetUser.status = 'shadow_banned';
+      // Hide all posts
+      await Question.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+      await Answer.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+    } else {
+      throw new AppError('Invalid action', 400);
+    }
+
+    // Deduct trust score: -10 for spam, -20 for abuse/harassment
+    const normalizedReason = (reason || '').toLowerCase();
+    if (normalizedReason.includes('spam')) {
+      targetUser.trustScore = Math.max(0, targetUser.trustScore - 10);
+    } else if (normalizedReason.includes('abuse') || normalizedReason.includes('abusive') || normalizedReason.includes('harassment')) {
+      targetUser.trustScore = Math.max(0, targetUser.trustScore - 20);
+    }
+
+    await targetUser.save();
+
+    // Send user sanction email notification
+    try {
+      if (targetUser.email) {
+        const { sendUserSanctionEmail } = require('../services/emailService');
+        await sendUserSanctionEmail(targetUser, action, reason, targetUser.suspendedUntil);
+      }
+    } catch (emailErr) {
+      console.error('Failed to send sanction email:', emailErr.message);
+    }
+
+    // Audit Log
+    await AuditLog.create({
+      adminId: req.user._id,
+      action: `user_${action}`,
+      targetId: targetUser._id,
+      targetType: 'User',
+      reason: reason || `Admin action: ${action}`
+    });
+
+    res.json({ message: `User successfully moderate with action: ${action}`, user: targetUser });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getSuspiciousActivity = async (req, res, next) => {
+  try {
+    const SuspiciousActivity = require('../models/SuspiciousActivity');
+    const activities = await SuspiciousActivity.find()
+      .populate('affectedUsers', 'username displayName email')
+      .sort({ flagDate: -1 });
+    res.json({ activities });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.getAuditLogs = async (req, res, next) => {
+  try {
+    const AuditLog = require('../models/AuditLog');
+    const logs = await AuditLog.find()
+      .populate('adminId', 'username displayName')
+      .sort({ timestamp: -1 });
+    res.json({ logs });
+  } catch (err) {
+    next(err);
+  }
+};
+
+
 

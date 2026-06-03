@@ -16,7 +16,7 @@ exports.createQuestion = async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) return res.status(400).json({ errors: errors.array() });
 
-    const { title, body, tags, anonymous } = req.body;
+    const { title, body, tags, anonymous, phase } = req.body;
     let tagIds = [];
     let tagNames = [];
 
@@ -39,6 +39,30 @@ exports.createQuestion = async (req, res, next) => {
 
     const existingQuestion = await findExistingQuestion(title, tagNames);
 
+    // Map user phase to question phase
+    const mapUserPhase = (userPhase) => {
+      switch (userPhase) {
+        case 'pre': return 'onboarding';
+        case 'phase1_coursework': return 'week1';
+        case 'phase1_completed': return 'week2';
+        case 'phase2_project': return 'week3';
+        case 'completed': return 'final';
+        default: return 'onboarding';
+      }
+    };
+
+    let visibility = req.body.visibility;
+    if (!visibility) {
+      if (req.user.trustLevel === 'trusted' || req.user.trustLevel === 'regular') {
+        visibility = 'public';
+      } else if (req.user.premodApproved) {
+        visibility = 'public';
+      } else {
+        const qCount = await Question.countDocuments({ author: req.user._id });
+        visibility = qCount < 3 ? 'pending' : 'public';
+      }
+    }
+
     const questionData = {
       title,
       body,
@@ -47,6 +71,9 @@ exports.createQuestion = async (req, res, next) => {
       tagNames,
       lastActivity: new Date(),
       isAnonymous: !!anonymous,
+      visibility,
+      triggeredRule: req.body.triggeredRule || undefined,
+      phase: phase || mapUserPhase(req.user.currentPhase) || 'onboarding'
     };
 
     if (existingQuestion) {
@@ -66,33 +93,39 @@ exports.createQuestion = async (req, res, next) => {
       });
     }
 
-    await Question.findByIdAndUpdate(req.user._id, { $inc: { questionCount: 1 } });
+    await User.findByIdAndUpdate(req.user._id, { $inc: { questionCount: 1 } });
 
     const populated = await Question.findById(question._id)
       .populate('author', 'username displayName avatar reputation')
       .populate('tags', 'name color')
       .populate('relatedQuestions', 'title answerCount');
 
-    await indexQuestion(populated);
+    // Only index and notify if it is immediately public
+    if (visibility === 'public') {
+      await indexQuestion(populated);
 
-    // Send new question notification email broadcast
-    try {
-      const { sendNewQuestionNotification } = require('../services/emailService');
-      const authorName = populated.author ? (populated.author.displayName || populated.author.username) : 'Anonymous';
-      await sendNewQuestionNotification(populated, authorName);
-    } catch (emailErr) {
-      console.error('Email notification error:', emailErr.message);
+      // Send new question notification email broadcast
+      try {
+        const { sendNewQuestionNotification } = require('../services/emailService');
+        const authorName = populated.author ? (populated.author.displayName || populated.author.username) : 'Anonymous';
+        await sendNewQuestionNotification(populated, authorName);
+      } catch (emailErr) {
+        console.error('Email notification error:', emailErr.message);
+      }
     }
 
-    res.status(201).json({ question: populated, alreadyAsked: existingQuestion ? {
-      isAlreadyAsked: true,
-      scopeMatch: existingQuestion.scopeMatch,
-      matchedQuestion: {
-        _id: existingQuestion.question._id,
-        title: existingQuestion.question.title,
-        answerCount: existingQuestion.question.answerCount,
-      },
-    } : null });
+    res.status(201).json({
+      question: populated,
+      alreadyAsked: existingQuestion ? {
+        isAlreadyAsked: true,
+        scopeMatch: existingQuestion.scopeMatch,
+        matchedQuestion: {
+          _id: existingQuestion.question._id,
+          title: existingQuestion.question.title,
+          answerCount: existingQuestion.question.answerCount,
+        },
+      } : null
+    });
   } catch (err) {
     next(err);
   }
@@ -178,6 +211,24 @@ exports.getQuestions = async (req, res, next) => {
       filter.$text = { $search: req.query.search };
     }
 
+    const isModOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'moderator');
+    const currentUserId = req.user ? req.user._id.toString() : null;
+
+    const visibilityConditions = [];
+    if (isModOrAdmin) {
+      // No visibility restrictions for admin/mod
+    } else if (currentUserId) {
+      visibilityConditions.push({ visibility: { $in: ['public', 'archived'] } });
+      visibilityConditions.push({ author: req.user._id });
+    } else {
+      visibilityConditions.push({ visibility: { $in: ['public', 'archived'] } });
+    }
+
+    if (visibilityConditions.length > 0) {
+      filter.$and = filter.$and || [];
+      filter.$and.push({ $or: visibilityConditions });
+    }
+
     const sort = {};
     switch (req.query.sort) {
       case 'newest': sort.createdAt = -1; break;
@@ -188,9 +239,6 @@ exports.getQuestions = async (req, res, next) => {
       case 'me-too': sort.meTooCount = -1; break;
       default: sort.createdAt = -1;
     }
-
-    const isModOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'moderator');
-    const currentUserId = req.user ? req.user._id.toString() : null;
 
     const [questions, total] = await Promise.all([
       Question.find(filter)
@@ -243,6 +291,15 @@ exports.getQuestion = async (req, res, next) => {
 
     if (!question) throw new AppError('Question not found', 404);
 
+    const isModOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'moderator');
+    const isAuthor = req.user && question.author && question.author._id.toString() === req.user._id.toString();
+
+    if (question.visibility !== 'public' && question.visibility !== 'archived') {
+      if (!isModOrAdmin && !isAuthor) {
+        throw new AppError('Question not found or pending moderation', 404);
+      }
+    }
+
     if (req.user) {
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
       const existingView = await QuestionView.findOne({
@@ -259,9 +316,6 @@ exports.getQuestion = async (req, res, next) => {
         await Question.findByIdAndUpdate(question._id, { $inc: { viewCount: 1 } });
       }
     }
-
-    const isModOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'moderator');
-    const isAuthor = req.user && question.author && question.author._id.toString() === req.user._id.toString();
 
     if (question.isAnonymous && !isModOrAdmin && !isAuthor) {
       question.author = {

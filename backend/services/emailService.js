@@ -326,3 +326,91 @@ exports.sendRolePromotionEmail = async (user, newRole) => {
   }
 };
 
+/**
+ * Notify user of account moderation action (warn, suspend, block, shadow_ban)
+ */
+exports.sendUserSanctionEmail = async (user, action, reason, suspendedUntil = null) => {
+  try {
+    const actionLabel = action.toUpperCase();
+    let durationText = '';
+    if (action === 'suspend' && suspendedUntil) {
+      durationText = `<p><strong>Suspension Ends:</strong> ${new Date(suspendedUntil).toLocaleString()}</p>`;
+    }
+
+    const htmlContent = `
+      <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="background: linear-gradient(135deg, #ef4444, #f97316); padding: 30px; border-radius: 12px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 24px;">⚠️ Account Moderation Notice</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Action Applied: ${actionLabel}</p>
+        </div>
+        <div style="padding: 20px; color: #334155; line-height: 1.6;">
+          <p>Hi <strong>${user.displayName || user.username}</strong>,</p>
+          <p>This is to inform you that your account on **PrashnaSārathi** has been placed under moderation restriction.</p>
+          
+          <div style="background-color: #fef2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 20px 0; border-radius: 4px;">
+            <p style="margin: 0; font-weight: bold; color: #991b1b;">Sanction details:</p>
+            <p style="margin: 5px 0 0 0; color: #b91c1c;"><strong>Status:</strong> ${actionLabel}</p>
+            <p style="margin: 5px 0 0 0; color: #b91c1c;"><strong>Reason:</strong> ${reason || 'Violation of community policies'}</p>
+            ${durationText}
+          </div>
+
+          <p>Please review our community guidelines to avoid further sanctions, which could result in permanent loss of access.</p>
+        </div>
+        <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
+          <p>Sent by PrashnaSārathi Moderation Team</p>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `PrashnaSārathi Moderation <${SENDER_EMAIL}>`,
+      to: user.email,
+      subject: `⚠️ Account Moderation Action: ${actionLabel}`,
+      html: htmlContent
+    });
+  } catch (err) {
+    console.error('Error sending user sanction email:', err.message);
+  }
+};
+
+/**
+ * Notify user when a post is rejected/removed by moderation
+ */
+exports.sendPostRejectionEmail = async (user, postType, postTitleOrBody, reason) => {
+  try {
+    const htmlContent = `
+      <div style="font-family: 'Outfit', 'Inter', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 16px; background-color: #ffffff;">
+        <div style="background: linear-gradient(135deg, #ef4444, #3b82f6); padding: 30px; border-radius: 12px; text-align: center; color: white;">
+          <h1 style="margin: 0; font-size: 24px;">🚫 Post Rejection Notice</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Your ${postType.toLowerCase()} was not approved</p>
+        </div>
+        <div style="padding: 20px; color: #334155; line-height: 1.6;">
+          <p>Hi <strong>${user.displayName || user.username}</strong>,</p>
+          <p>This is to inform you that your recently submitted ${postType.toLowerCase()} was reviewed by moderation and has been rejected.</p>
+          
+          <div style="background-color: #fafafa; border: 1px solid #e2e8f0; padding: 15px; margin: 20px 0; border-radius: 8px;">
+            <p style="margin: 0; font-weight: bold; color: #334155;">Post Content Preview:</p>
+            <p style="margin: 5px 0 15px 0; color: #64748b; font-style: italic;">"${postTitleOrBody.substring(0, 150)}..."</p>
+            <p style="margin: 0; font-weight: bold; color: #334155;">Reason for Rejection:</p>
+            <p style="margin: 5px 0 0 0; color: #ef4444; font-weight: bold;">${reason || 'Does not meet our content quality guidelines'}</p>
+          </div>
+
+          <p>Please refer to community guidelines when posting content in the future.</p>
+        </div>
+        <div style="margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 20px; text-align: center; font-size: 12px; color: #94a3b8;">
+          <p>Sent by PrashnaSārathi Moderation Team</p>
+        </div>
+      </div>
+    `;
+
+    await transporter.sendMail({
+      from: `PrashnaSārathi Moderation <${SENDER_EMAIL}>`,
+      to: user.email,
+      subject: `🚫 Post Rejected: Your ${postType.toLowerCase()} was not approved`,
+      html: htmlContent
+    });
+  } catch (err) {
+    console.error('Error sending post rejection email:', err.message);
+  }
+};
+

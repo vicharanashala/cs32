@@ -332,7 +332,16 @@ Medium-Impact Quality of Life
 4. **FAQ Recommendation Engine Overhaul**
    * *Resolution*: Refined the recommendation service to use flexible keyword-based matching for user phases, redesigned the `RecommendedFAQs` modal to show contextual labels, and updated `faqController.js` with dynamic Redis caching TTLs (guest bypass, 10m for no-phase users, 30m for phased users).
 
-5. **Docker Platform-Agnostic Stability**
+5. **Rule-Based Spam Prevention & Trust Score Recalculation**
+   * *Resolution*: Implemented automatic trustScore changes (+5 for accepted answers, +2 for helpful upvotes, +1 for daily login, -10 for spam report confirmed, -20 for abuse confirmed) and hooked them into post accepted/unaccepted, upvote, daily login benefit on authController, and admin moderation action flows.
+
+6. **Moderation Action Email Notifications**
+   * *Resolution*: Created `sendUserSanctionEmail` and `sendPostRejectionEmail` in `emailService.js` and integrated them into user moderation and post rejection endpoints in `adminController.js` to automatically alert users.
+
+7. **Syntax Errors, Formatting & Tab Key Mapping Fixes**
+   * *Resolution*: Fixed double return closures in `Navbar.js` layouts, resolved syntax errors in detail page components, mapped internal keys like `moderationQueue` to human-readable labels, and enabled horizontal scroll.
+
+8. **Docker Platform-Agnostic Stability**
    * *Resolution*: Configured volume compatibility, disabled Elasticsearch memory lock for Windows/macOS, enabled polling for Next.js hot-reloads, and fixed `docker-entrypoint.sh` crash loops on Atlas MongoDB connectivity.
 
 #### Latest Fixes (June 2, 2026)

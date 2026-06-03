@@ -21,6 +21,7 @@ if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 const authRoutes = require('./routes/auth');
 const questionRoutes = require('./routes/questions');
 const answerRoutes = require('./routes/answers');
+const postRoutes = require('./routes/posts');
 const voteRoutes = require('./routes/votes');
 const faqRoutes = require('./routes/faqs');
 const searchRoutes = require('./routes/search');
@@ -65,6 +66,7 @@ app.get('/api/health', (req, res) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/questions', questionRoutes);
 app.use('/api/answers', answerRoutes);
+app.use('/api/posts', postRoutes);
 app.use('/api/votes', voteRoutes);
 app.use('/api/faqs', faqRoutes);
 app.use('/api/search', searchRoutes);

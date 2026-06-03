@@ -22,4 +22,13 @@ router.post('/reports/:id/resolve', auth, adminOnly, ctrl.resolveSiteReport);
 
 router.post('/questions/:id/convert-to-faq', auth, moderatorOrAdmin, ctrl.convertQuestionToFAQItem);
 
+// Moderation Endpoints
+router.get('/moderation/queue', auth, adminOnly, ctrl.getModerationQueue);
+router.post('/moderation/approve', auth, adminOnly, ctrl.approvePost);
+router.post('/moderation/reject', auth, adminOnly, ctrl.rejectPost);
+router.get('/moderation/reported', auth, adminOnly, ctrl.getReportedPosts);
+router.post('/moderation/action', auth, adminOnly, ctrl.moderateUser);
+router.get('/moderation/suspicious', auth, adminOnly, ctrl.getSuspiciousActivity);
+router.get('/moderation/audit-logs', auth, adminOnly, ctrl.getAuditLogs);
+
 module.exports = router;

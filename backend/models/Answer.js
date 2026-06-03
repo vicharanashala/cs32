@@ -48,6 +48,18 @@ const answerSchema = new mongoose.Schema({
     enum: ['low', 'medium', 'high', null],
     default: null,
   },
+  // Moderation & Visibility Fields
+  visibility: {
+    type: String,
+    enum: ["public", "pending", "hidden", "archived"],
+    default: "pending"
+  },
+  reportCount: { type: Number, default: 0 },
+  reportedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  triggeredRule: { type: String },
 }, { timestamps: true });
 
 answerSchema.index({ question: 1, createdAt: 1 });

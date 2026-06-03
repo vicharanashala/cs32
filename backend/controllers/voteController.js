@@ -58,7 +58,14 @@ exports.vote = async (req, res, next) => {
       await existingVote.deleteOne();
       await Model.findByIdAndUpdate(targetId, { $inc: { [`${voteType}s`]: -1 } });
       if (target.author.toString() !== req.user._id.toString()) {
-        await User.findByIdAndUpdate(target.author, { $inc: { reputation: voteType === 'upvote' ? -10 : 10 } });
+        const authorUser = await User.findById(target.author);
+        if (authorUser) {
+          authorUser.reputation = Math.max(0, authorUser.reputation + (voteType === 'upvote' ? -10 : 10));
+          if (voteType === 'upvote') {
+            authorUser.trustScore = Math.max(0, authorUser.trustScore - 2);
+          }
+          await authorUser.save();
+        }
       }
       releaseVoteLock(req.user._id, targetId);
       try {
@@ -76,7 +83,16 @@ exports.vote = async (req, res, next) => {
       await existingVote.save();
       await Model.findByIdAndUpdate(targetId, { $inc: { [`${oldType}s`]: -1, [`${voteType}s`]: 1 } });
       if (target.author.toString() !== req.user._id.toString()) {
-        await User.findByIdAndUpdate(target.author, { $inc: { reputation: voteType === 'upvote' ? 10 : -10 } });
+        const authorUser = await User.findById(target.author);
+        if (authorUser) {
+          authorUser.reputation = Math.max(0, authorUser.reputation + (voteType === 'upvote' ? 10 : -10));
+          if (voteType === 'upvote') {
+            authorUser.trustScore += 2;
+          } else {
+            authorUser.trustScore = Math.max(0, authorUser.trustScore - 2);
+          }
+          await authorUser.save();
+        }
       }
       releaseVoteLock(req.user._id, targetId);
       try {
@@ -97,8 +113,14 @@ exports.vote = async (req, res, next) => {
     await Model.findByIdAndUpdate(targetId, { $inc: { [`${voteType}s`]: 1 } });
 
     if (target.author.toString() !== req.user._id.toString()) {
-      const repChange = voteType === 'upvote' ? 10 : -10;
-      await User.findByIdAndUpdate(target.author, { $inc: { reputation: repChange } });
+      const authorUser = await User.findById(target.author);
+      if (authorUser) {
+        authorUser.reputation = Math.max(0, authorUser.reputation + (voteType === 'upvote' ? 10 : -10));
+        if (voteType === 'upvote') {
+          authorUser.trustScore += 2;
+        }
+        await authorUser.save();
+      }
     }
 
     if (voteType === 'upvote' && target.author.toString() !== req.user._id.toString()) {

@@ -11,6 +11,15 @@ const generateToken = (user) => {
   });
 };
 
+const applyDailyLoginBenefit = (user) => {
+  const today = new Date().toDateString();
+  const lastActiveDay = user.lastActive ? new Date(user.lastActive).toDateString() : null;
+  if (lastActiveDay !== today) {
+    user.trustScore = (user.trustScore || 0) + 1;
+  }
+  user.lastActive = new Date();
+};
+
 exports.register = async (req, res, next) => {
   try {
     const errors = validationResult(req);
@@ -23,7 +32,9 @@ exports.register = async (req, res, next) => {
       throw new AppError('Username or email already exists', 409);
     }
 
-    const user = await User.create({ username, email, password, displayName: username });
+    const user = new User({ username, email, password, displayName: username });
+    applyDailyLoginBenefit(user);
+    await user.save();
     await indexUser(user);
     const token = generateToken(user);
 
@@ -51,7 +62,7 @@ exports.login = async (req, res, next) => {
       throw new AppError(`Account banned: ${user.banReason}`, 403);
     }
 
-    user.lastActive = new Date();
+    applyDailyLoginBenefit(user);
     await user.save();
 
     const token = generateToken(user);
@@ -228,7 +239,7 @@ exports.googleLogin = async (req, res, next) => {
       if (user.isBanned) {
         throw new AppError(`Account banned: ${user.banReason}`, 403);
       }
-      user.lastActive = new Date();
+      applyDailyLoginBenefit(user);
       let needsReindex = false;
 
       if (email && user.email !== email) {
@@ -268,7 +279,7 @@ exports.googleLogin = async (req, res, next) => {
         user.avatarUrl = picture;
         user.avatar = picture;
       }
-      user.lastActive = new Date();
+      applyDailyLoginBenefit(user);
       await user.save();
       await indexUser(user);
       const jwtToken = generateToken(user);
@@ -277,7 +288,7 @@ exports.googleLogin = async (req, res, next) => {
 
     // Auto-create Google user
     const username = await generateUniqueUsername(email);
-    user = await User.create({
+    user = new User({
       username,
       email,
       displayName: name || username,
@@ -287,6 +298,8 @@ exports.googleLogin = async (req, res, next) => {
       authProvider: 'google',
       hasCompletedOnboarding: false,
     });
+    applyDailyLoginBenefit(user);
+    await user.save();
 
     await indexUser(user);
     const jwtToken = generateToken(user);

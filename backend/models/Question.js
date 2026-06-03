@@ -18,6 +18,7 @@ const questionSchema = new mongoose.Schema({
     required: true,
   },
   isAnonymous: { type: Boolean, default: false },
+  category: { type: String },
   tags: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Tag',
@@ -127,6 +128,24 @@ const questionSchema = new mongoose.Schema({
 
   // Timestamps
   lastActivity: { type: Date },
+
+  // Moderation & Visibility Fields
+  visibility: {
+    type: String,
+    enum: ["public", "pending", "hidden", "archived"],
+    default: "pending"
+  },
+  reportCount: { type: Number, default: 0 },
+  reportedBy: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  }],
+  triggeredRule: { type: String },
+  phase: {
+    type: String,
+    enum: ["onboarding", "week1", "week2", "week3", "final", "certificate"]
+  },
+  archivedAt: { type: Date },
 }, { timestamps: true });
 
 questionSchema.index({ title: 'text', body: 'text' });
