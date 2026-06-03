@@ -73,6 +73,13 @@ exports.reportPost = async (req, res, next) => {
 
     await post.save();
 
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'report_post', postType, postId: post._id });
+    } catch (err) {
+      console.error('Socket notification error in reportPost:', err.message);
+    }
+
     res.json({ message: 'Post reported successfully', reportCount: post.reportCount });
   } catch (err) {
     next(err);

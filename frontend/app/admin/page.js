@@ -5,6 +5,7 @@ import { useAuth } from '@/context/AuthContext';
 import api from '@/lib/api';
 import { formatDate } from '@/lib/utils';
 import toast from 'react-hot-toast';
+import { useSocket } from '@/context/SocketContext';
 export default function AdminPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -23,6 +24,7 @@ export default function AdminPage() {
   const [anomalyPage, setAnomalyPage] = useState(1);
   const [anomalyPagination, setAnomalyPagination] = useState({ page: 1, pages: 1 });
   const [loading, setLoading] = useState(true);
+  const socket = useSocket();
 
   const [moderationQueue, setModerationQueue] = useState({ questions: [], answers: [] });
   const [reportedPosts, setReportedPosts] = useState([]);
@@ -47,6 +49,29 @@ export default function AdminPage() {
       fetchSiteReports();
     }
   }, [user]);
+
+  useEffect(() => {
+    if (!socket) return;
+    const handleModerationUpdate = () => {
+      fetchDashboard();
+      fetchUsers();
+      fetchFlagged();
+      fetchDeepData();
+      fetchAnomalies();
+      fetchModerationQueue();
+      fetchReportedPosts();
+      fetchSuspiciousActivities();
+      fetchAuditLogs();
+      if (user?.role === 'admin') {
+        fetchSiteReports();
+      }
+    };
+    socket.on('moderation:updated', handleModerationUpdate);
+    return () => {
+      socket.off('moderation:updated', handleModerationUpdate);
+    };
+  }, [socket, user]);
+
   useEffect(() => {
     if (user && (user.role === 'admin' || user.role === 'moderator')) {
       fetchAnomalies();
@@ -238,8 +263,11 @@ export default function AdminPage() {
   };
 
   const tabs = ['dashboard', 'users', 'flagged', 'anomalies'];
+  if (user?.role === 'admin' || user?.role === 'moderator') {
+    tabs.push('moderationQueue', 'reportedPosts', 'suspiciousActivities', 'auditLogs');
+  }
   if (user?.role === 'admin') {
-    tabs.push('siteReports', 'moderationQueue', 'reportedPosts', 'suspiciousActivities', 'auditLogs');
+    tabs.push('siteReports');
   }
   if (user?.role !== 'admin') {
     const uIdx = tabs.indexOf('users');

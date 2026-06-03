@@ -596,7 +596,7 @@ export default function QuestionDetailPage() {
             <Link href={`/users/${question.author?.username}`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors">
               {question.author?.avatar ? (
                 <img 
-                  src={question.author.avatar.startsWith('http') ? question.author.avatar : `${api.baseUrl.replace('/api', '')}${question.author.avatar}`} 
+                  src={(question.author.avatar.startsWith('http') || question.author.avatar.startsWith('data:')) ? question.author.avatar : `${api.baseUrl.replace('/api', '')}${question.author.avatar}`} 
                   alt="" 
                   className="w-5 h-5 rounded-full object-cover" 
                 />
@@ -703,7 +703,7 @@ export default function QuestionDetailPage() {
                           <Link href={`/users/${answer.author?.username}`} className="flex items-center gap-1.5 hover:text-primary-600 transition-colors">
                             {answer.author?.avatar ? (
                               <img 
-                                src={answer.author.avatar.startsWith('http') ? answer.author.avatar : `${api.baseUrl.replace('/api', '')}${answer.author.avatar}`} 
+                                src={(answer.author.avatar.startsWith('http') || answer.author.avatar.startsWith('data:')) ? answer.author.avatar : `${api.baseUrl.replace('/api', '')}${answer.author.avatar}`} 
                                 alt="" 
                                 className="w-5 h-5 rounded-full object-cover" 
                               />

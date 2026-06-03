@@ -66,6 +66,13 @@ exports.createAnswer = async (req, res, next) => {
       }
 
       emitToQuestion(question._id.toString(), 'answer:new', { answer: populated });
+    } else if (visibility === 'pending') {
+      try {
+        const { emitToAdmin } = require('../socket');
+        emitToAdmin('moderation:updated', { action: 'new_pending_answer', answerId: answer._id });
+      } catch (err) {
+        console.error('Socket notification error for pending answer:', err.message);
+      }
     }
 
     res.status(201).json({ answer: populated });
@@ -182,7 +189,8 @@ exports.deleteAnswer = async (req, res, next) => {
     answer.isDeleted = true;
     answer.status = 'deleted';
     await answer.save();
-    await Question.findByIdAndUpdate(answer.question, { $inc: { answerCount: -1 } });
+    const { recalculateAnswerCount } = require('../utils/helpers');
+    await recalculateAnswerCount(answer.question);
     res.json({ message: 'Answer deleted' });
   } catch (err) {
     next(err);

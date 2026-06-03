@@ -263,24 +263,10 @@ exports.markFAQHelpful = async (req, res, next) => {
 
 exports.getRecommendedFAQs = async (req, res, next) => {
   try {
-    const Question = require('../models/Question');
-    const currentPhase = req.user ? (req.user.currentPhase || 'onboarding') : 'onboarding';
-
-    const resolvedQuestions = await Question.find({
-      isFAQ: true,
-      phase: currentPhase,
-      visibility: 'public',
-      isDeleted: { $ne: true }
-    })
-    .populate('author', 'username displayName avatar reputation')
-    .populate('tags', 'name color')
-    .populate({
-      path: 'acceptedAnswer',
-      populate: { path: 'author', select: 'username displayName avatar reputation' }
-    })
-    .sort({ upvotes: -1, createdAt: -1 });
-
-    res.json({ faqs: resolvedQuestions });
+    const { getRecommendedFAQs } = require('../services/recommendationService');
+    const userId = req.user ? req.user._id : null;
+    const faqs = await getRecommendedFAQs(userId);
+    res.json({ faqs });
   } catch (err) {
     next(err);
   }

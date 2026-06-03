@@ -344,6 +344,12 @@ Medium-Impact Quality of Life
 8. **Docker Platform-Agnostic Stability**
    * *Resolution*: Configured volume compatibility, disabled Elasticsearch memory lock for Windows/macOS, enabled polling for Next.js hot-reloads, and fixed `docker-entrypoint.sh` crash loops on Atlas MongoDB connectivity.
 
+9. **Real-Time Admin Sync & Moderation Live-Updates**
+   * *Resolution*: Modified socket connection logic to room-join privileged admin/moderators, created the helper `emitToAdmin()`, and configured frontend admin dashboards to listen and auto-refresh reports/moderation queues in real-time.
+
+10. **Question Answer Count Synchronization**
+    * *Resolution*: Introduced the helper `recalculateAnswerCount()` and integrated it into all moderation pipelines (such as blocking users, shadow banning users, deleting users, or rejecting/deleting answers) to prevent the "answers count mismatch" bug where question statistics display more answers than actually exist.
+
 #### Latest Fixes (June 2, 2026)
 
 1. **Firebase Admin User Synchronization & Real-time Pruning**

@@ -112,6 +112,13 @@ exports.createQuestion = async (req, res, next) => {
       } catch (emailErr) {
         console.error('Email notification error:', emailErr.message);
       }
+    } else if (visibility === 'pending') {
+      try {
+        const { emitToAdmin } = require('../socket');
+        emitToAdmin('moderation:updated', { action: 'new_pending_question', questionId: question._id });
+      } catch (err) {
+        console.error('Socket notification error for pending question:', err.message);
+      }
     }
 
     res.status(201).json({

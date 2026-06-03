@@ -87,6 +87,15 @@ exports.updateUserRole = async (req, res, next) => {
       }
     }
 
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'update_role', userId: user._id, role });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in updateUserRole:', err.message);
+    }
+
     res.json({ user });
   } catch (err) {
     next(err);
@@ -97,6 +106,16 @@ exports.banUser = async (req, res, next) => {
   try {
     const { reason } = req.body;
     await banUser({ userId: req.params.id, reason: reason || 'Violation of terms' });
+
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'ban_user', userId: req.params.id });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in banUser:', err.message);
+    }
+
     res.json({ message: 'User banned' });
   } catch (err) {
     next(err);
@@ -106,6 +125,16 @@ exports.banUser = async (req, res, next) => {
 exports.unbanUser = async (req, res, next) => {
   try {
     await unbanUser(req.params.id);
+
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'unban_user', userId: req.params.id });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in unbanUser:', err.message);
+    }
+
     res.json({ message: 'User unbanned' });
   } catch (err) {
     next(err);
@@ -120,12 +149,31 @@ exports.deleteUser = async (req, res, next) => {
 
     console.log(`[Admin Action] Deleting user ${user.username} (${user.email}) completely.`);
 
+    // Find all answers of the user before deleting to update parent question counts
+    const Answer = require('../models/Answer');
+    const userAnswers = await Answer.find({ author: userId });
+    const questionIds = [...new Set(userAnswers.map(a => a.question.toString()))];
+
     // Cascading deletion
     await Promise.all([
       Question.deleteMany({ author: userId }),
       Answer.deleteMany({ author: userId }),
       User.deleteOne({ _id: userId })
     ]);
+
+    const { recalculateAnswerCount } = require('../utils/helpers');
+    for (const qId of questionIds) {
+      await recalculateAnswerCount(qId);
+    }
+
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'delete_user', userId });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in deleteUser:', err.message);
+    }
 
     res.json({ success: true, message: 'User and all related data deleted successfully' });
   } catch (err) {
@@ -270,6 +318,13 @@ exports.resolveAnomaly = async (req, res, next) => {
       .populate('author', 'username displayName email')
       .populate('anomalyResolvedBy', 'username displayName');
 
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'resolve_anomaly', questionId: question._id });
+    } catch (err) {
+      console.error('Socket notification error in resolveAnomaly:', err.message);
+    }
+
     res.json({ message: 'Anomaly marked as resolved', question: populated });
   } catch (err) {
     next(err);
@@ -326,6 +381,14 @@ exports.resolveSiteReport = async (req, res, next) => {
       { new: true }
     );
     if (!report) throw new AppError('Report not found', 404);
+
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'resolve_site_report', reportId: report._id });
+    } catch (err) {
+      console.error('Socket notification error in resolveSiteReport:', err.message);
+    }
+
     res.json({ message: 'Site report marked as resolved', report });
   } catch (err) {
     next(err);
@@ -483,6 +546,15 @@ exports.approvePost = async (req, res, next) => {
       reason: 'Approved from pre-moderation queue'
     });
 
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'approve_post', postType, postId: post._id });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in approvePost:', err.message);
+    }
+
     res.json({ message: 'Post approved successfully', post });
   } catch (err) {
     next(err);
@@ -528,6 +600,15 @@ exports.rejectPost = async (req, res, next) => {
       reason: reason || 'Rejected from pre-moderation queue'
     });
 
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'reject_post', postType, postId: post._id });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in rejectPost:', err.message);
+    }
+
     res.json({ message: 'Post rejected and hidden successfully' });
   } catch (err) {
     next(err);
@@ -570,12 +651,30 @@ exports.moderateUser = async (req, res, next) => {
       targetUser.status = 'blocked';
       // Hide all posts
       await Question.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+      
+      const Answer = require('../models/Answer');
+      const userAnswers = await Answer.find({ author: targetUser._id });
+      const questionIds = [...new Set(userAnswers.map(a => a.question.toString()))];
       await Answer.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+
+      const { recalculateAnswerCount } = require('../utils/helpers');
+      for (const qId of questionIds) {
+        await recalculateAnswerCount(qId);
+      }
     } else if (action === 'shadow_ban') {
       targetUser.status = 'shadow_banned';
       // Hide all posts
       await Question.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+
+      const Answer = require('../models/Answer');
+      const userAnswers = await Answer.find({ author: targetUser._id });
+      const questionIds = [...new Set(userAnswers.map(a => a.question.toString()))];
       await Answer.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+
+      const { recalculateAnswerCount } = require('../utils/helpers');
+      for (const qId of questionIds) {
+        await recalculateAnswerCount(qId);
+      }
     } else {
       throw new AppError('Invalid action', 400);
     }
@@ -608,6 +707,15 @@ exports.moderateUser = async (req, res, next) => {
       targetType: 'User',
       reason: reason || `Admin action: ${action}`
     });
+
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: `user_${action}`, userId: targetUser._id });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in moderateUser:', err.message);
+    }
 
     res.json({ message: `User successfully moderate with action: ${action}`, user: targetUser });
   } catch (err) {
