@@ -37,27 +37,36 @@ export default function AdminPage() {
       return;
     }
     
-    // Lazy-load data based on active tab
-    if (tab === 'dashboard') {
-      fetchDashboard();
-      fetchDeepData();
-    } else if (tab === 'users') {
-      fetchUsers();
-    } else if (tab === 'flagged') {
-      fetchFlagged();
-    } else if (tab === 'anomalies') {
-      fetchAnomalies();
-    } else if (tab === 'moderationQueue') {
-      fetchModerationQueue();
-    } else if (tab === 'reportedPosts') {
-      fetchReportedPosts();
-    } else if (tab === 'suspiciousActivities') {
-      fetchSuspiciousActivities();
-    } else if (tab === 'auditLogs') {
-      fetchAuditLogs();
-    } else if (tab === 'siteReports' && user.role === 'admin') {
-      fetchSiteReports();
-    }
+    const loadData = async () => {
+      setLoading(true);
+      try {
+        if (tab === 'dashboard') {
+          await Promise.all([fetchDashboard(), fetchDeepData()]);
+        } else if (tab === 'users') {
+          await fetchUsers();
+        } else if (tab === 'flagged') {
+          await fetchFlagged();
+        } else if (tab === 'anomalies') {
+          await fetchAnomalies();
+        } else if (tab === 'moderationQueue') {
+          await fetchModerationQueue();
+        } else if (tab === 'reportedPosts') {
+          await fetchReportedPosts();
+        } else if (tab === 'suspiciousActivities') {
+          await fetchSuspiciousActivities();
+        } else if (tab === 'auditLogs') {
+          await fetchAuditLogs();
+        } else if (tab === 'siteReports' && user.role === 'admin') {
+          await fetchSiteReports();
+        }
+      } catch (err) {
+        console.error("Error loading admin data:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
   }, [user, tab]);
 
   useEffect(() => {
@@ -126,7 +135,6 @@ export default function AdminPage() {
       setFlaggedQs(data.flaggedQuestions || []);
       setFlaggedAs(data.flaggedAnswers || []);
     } catch (_) {}
-    finally { setLoading(false); }
   };
   const fetchAnomalies = async () => {
     try {
