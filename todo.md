@@ -320,7 +320,13 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 4, 2026)
 
-1. **Moderation Warning Banner — Shown to All Users Instead of Author Only**
+1. **Vercel Build Error — Context Prerender / Null Destructure Fix**
+   * *Bug*: The build failed on Vercel during static page prerendering with the error: `TypeError: Cannot destructure property 'unreadCount' of 'x(...)' as it is null.` This occurred because `layout.js` did not wrap the subtree with the `NotificationProvider` (so `useNotifications()` returned `null`), and `Navbar.js` did not check if the hook returned a null value.
+   * *Resolution*:
+     1. Updated `layout.js` to wrap the app tree with `<NotificationProvider>` nested inside `<SocketProvider>` (so socket instance is available to notifications context).
+     2. Updated `Navbar.js` with a defensive fallback for `useNotifications()` to safely default to `unreadCount = 0` if context is `null` during static pre-rendering compilation.
+
+2. **Moderation Warning Banner — Shown to All Users Instead of Author Only**
    * *Bug*: The "pending moderation" and "hidden" banners on question detail pages were shown to every visitor, not just the question author. Regular students could see "This question is pending moderation" even on questions that had already been answered.
    * *Resolution*: Added guard condition so banners only render for the question author OR admin/moderator. Updated text to *"Your question is pending moderation. It will be visible to everyone once approved by a moderator."* — clearer and author-scoped.
 
