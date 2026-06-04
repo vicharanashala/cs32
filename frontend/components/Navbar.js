@@ -10,7 +10,8 @@ import { useNotifications } from '@/context/NotificationContext';
 export default function Navbar({ onSearch }) {
   const { user, logout } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const { unreadCount } = useNotifications();
+  const notifications = useNotifications();
+  const unreadCount = notifications ? notifications.unreadCount : 0;
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);

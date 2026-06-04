@@ -1,6 +1,7 @@
 import '@/styles/globals.css';
 import { AuthProvider } from '@/context/AuthContext';
 import { SocketProvider } from '@/context/SocketContext';
+import { NotificationProvider } from '@/context/NotificationContext';
 import { KeyboardProvider } from '@/context/KeyboardContext';
 import { ThemeProvider } from '@/context/ThemeContext';
 import Navbar from '@/components/Navbar';
@@ -36,19 +37,21 @@ export default function RootLayout({ children }) {
         </div>
         <AuthProvider>
           <SocketProvider>
-            <KeyboardProvider>
-              <ThemeProvider>
-                <Navbar />
-                <OnboardingModal />
-                <ReportIssueButton />
-                <NetworkStatus />
-                <main className="flex-1">
-                  {children}
-                </main>
-                <Footer />
-                <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
-              </ThemeProvider>
-            </KeyboardProvider>
+            <NotificationProvider>
+              <KeyboardProvider>
+                <ThemeProvider>
+                  <Navbar />
+                  <OnboardingModal />
+                  <ReportIssueButton />
+                  <NetworkStatus />
+                  <main className="flex-1">
+                    {children}
+                  </main>
+                  <Footer />
+                  <Toaster position="top-right" toastOptions={{ duration: 3000 }} />
+                </ThemeProvider>
+              </KeyboardProvider>
+            </NotificationProvider>
           </SocketProvider>
         </AuthProvider>
       </body>
