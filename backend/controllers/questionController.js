@@ -1015,3 +1015,64 @@ exports.clearFlagQuestion = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.validateQuestionText = async (req, res, next) => {
+  try {
+    const { title, body } = req.body;
+
+    // Heuristic 1: Repeated Character Pattern /(.)\1{6,}/
+    const repeatedCharPattern = /(.)\1{6,}/;
+    if ((title && repeatedCharPattern.test(title)) || (body && repeatedCharPattern.test(body))) {
+      return res.json({ valid: false, reason: "Message contains repeated character patterns (spam/noise)." });
+    }
+
+    // Heuristic 2: Gibberish detection
+    const isGibberish = (text) => {
+      if (!text || text.length < 5) return false;
+      const lower = text.toLowerCase();
+      const letters = lower.replace(/[^a-z]/g, '');
+      if (letters.length < 5) return false;
+      // Check vowel ratio — real words need at least 10% vowels
+      const vowels = (letters.match(/[aeiou]/g) || []).length;
+      const vowelRatio = vowels / letters.length;
+      if (vowelRatio < 0.10) return true; // nearly no vowels = gibberish
+      // Check consecutive consonant clusters (6+ in a row)
+      if (/[bcdfghjklmnpqrstvwxyz]{6,}/.test(lower)) return true;
+      // Check unique char ratio — real sentences have repetition
+      const uniqueChars = new Set(letters).size;
+      const uniqueRatio = uniqueChars / letters.length;
+      if (letters.length > 12 && uniqueRatio > 0.85) return true;
+      return false;
+    };
+
+    if ((title && isGibberish(title)) || (body && isGibberish(body))) {
+      return res.json({ valid: false, reason: "Your input appears to be gibberish or random characters. Please write a clear, meaningful question." });
+    }
+
+    // Call FastAPI AI microservice for zero-shot validation (if title is provided)
+    if (title && title.trim().length >= 8) {
+      try {
+        const axios = require('axios');
+        const config = require('../config');
+        const response = await axios.post(`${config.fastApiUrl}/api/v1/validate`, {
+          text: title
+        }, { timeout: 1500 }); // Fast timeout for typing responsiveness
+
+        if (response.data && response.data.valid === false) {
+          return res.json({
+            valid: false,
+            reason: response.data.reason || 'AI flagged this as unreadable noise.'
+          });
+        }
+      } catch (err) {
+        // Log but don't fail, fallback to valid since local checks passed
+        console.error('[AI Validate typing] FastAPI validation failed or timed out:', err.message);
+      }
+    }
+
+    return res.json({ valid: true });
+  } catch (err) {
+    next(err);
+  }
+};
+

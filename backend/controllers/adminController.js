@@ -658,6 +658,19 @@ exports.moderateUser = async (req, res, next) => {
       targetUser.violationCount += 1;
       const hours = durationHours ? parseInt(durationHours) : 24;
       targetUser.suspendedUntil = new Date(Date.now() + hours * 60 * 60 * 1000);
+      
+      // Hide all posts
+      await Question.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+
+      const Answer = require('../models/Answer');
+      const userAnswers = await Answer.find({ author: targetUser._id });
+      const questionIds = [...new Set(userAnswers.map(a => a.question.toString()))];
+      await Answer.updateMany({ author: targetUser._id }, { visibility: 'hidden' });
+
+      const { recalculateAnswerCount } = require('../utils/helpers');
+      for (const qId of questionIds) {
+        await recalculateAnswerCount(qId);
+      }
     } else if (action === 'block') {
       targetUser.status = 'blocked';
       // Hide all posts

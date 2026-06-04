@@ -167,6 +167,23 @@ const spamGuard = async (req, res, next) => {
         user.status = 'suspended';
         user.suspendedUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
         await user.save();
+
+        // Hide all user's content
+        await Question.updateMany({ author: user._id }, { visibility: 'hidden' });
+        await Answer.updateMany({ author: user._id }, { visibility: 'hidden' });
+
+        // Recalculate answer counts for affected questions
+        try {
+          const { recalculateAnswerCount } = require('../utils/helpers');
+          const userAnswers = await Answer.find({ author: user._id });
+          const questionIds = [...new Set(userAnswers.map(a => a.question.toString()))];
+          for (const qId of questionIds) {
+            await recalculateAnswerCount(qId);
+          }
+        } catch (err) {
+          console.error('[spamGuard] Failed to recalculate answer counts during auto-suspension:', err.message);
+        }
+
         return res.status(403).json({ suspended: true, retryAfter: user.suspendedUntil.getTime() });
       }
 
@@ -198,6 +215,30 @@ const spamGuard = async (req, res, next) => {
     if (repeatedCharPattern.test(title) || repeatedCharPattern.test(body)) {
       await handleViolation(user);
       return res.status(400).json({ blocked: false, reason: "Message contains repeated character patterns" });
+    }
+
+    // Gibberish / randomstring detection
+    const isGibberish = (text) => {
+      if (!text || text.length < 5) return false;
+      const lower = text.toLowerCase();
+      const letters = lower.replace(/[^a-z]/g, '');
+      if (letters.length < 5) return false;
+      // Check vowel ratio — real words need at least 10% vowels
+      const vowels = (letters.match(/[aeiou]/g) || []).length;
+      const vowelRatio = vowels / letters.length;
+      if (vowelRatio < 0.10) return true; // nearly no vowels = gibberish
+      // Check consecutive consonant clusters (6+ in a row)
+      if (/[bcdfghjklmnpqrstvwxyz]{6,}/.test(lower)) return true;
+      // Check unique char ratio — real sentences have repetition
+      const uniqueChars = new Set(letters).size;
+      const uniqueRatio = uniqueChars / letters.length;
+      if (letters.length > 12 && uniqueRatio > 0.85) return true;
+      return false;
+    };
+
+    if (isQuestion && ((title && isGibberish(title)) || (body && isGibberish(body)))) {
+      await handleViolation(user);
+      return res.status(400).json({ blocked: false, reason: "Your question appears to be gibberish or random characters. Please write a clear, meaningful question." });
     }
 
     const externalLinkRegex = /https?:\/\//g;
