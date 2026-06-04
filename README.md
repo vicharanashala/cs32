@@ -124,8 +124,6 @@ faq-site/
 │   ├── services/         # ES search, recommendations, analytics, moderation
 │   ├── socket/           # Socket.IO real-time setup
 │   └── utils/            # Helpers, validators, permissions
-│   ├── socket/           # Socket.IO real-time setup
-│   └── utils/            # Helpers, validators, permissions
 ├── frontend/             # Next.js 14 app (port 3000)
 │   ├── app/              # App Router pages (faqs, questions, admin, auth, etc.)
 │   ├── components/       # Shared React components
@@ -134,6 +132,10 @@ faq-site/
 │   ├── lib/              # API client & utilities
 │   ├── services/         # Frontend services (admin analytics, etc.)
 │   └── styles/           # Global CSS with Tailwind
+├── FastAPI_python_model/ # FastAPI AI microservice (spam & noise classification)
+│   ├── main.py           # FastAPI server entry point
+│   ├── Dockerfile        # Container setup for Python dependencies
+│   └── requirements.txt  # Python packages list
 ├── nginx/                # Nginx reverse proxy config
 ├── podman/               # Podman/Docker deployment files
 ├── kafka/                # Optional Kafka docker-compose
@@ -141,7 +143,9 @@ faq-site/
 ├── .dockerignore         # Docker build context exclusions
 ├── setup-docker.sh       # Cross-platform Docker setup script
 ├── faqs-complete.json    # 126 FAQ items (seed data)
-└── metadata.json         # Category metadata
+├── metadata.json         # Category metadata
+├── vercel.json           # Frontend Vercel hosting config
+└── todo.md               # Tracking document for fixes and features
 ```
 
 ## Key Features
