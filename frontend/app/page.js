@@ -359,7 +359,26 @@ export default function HomePage() {
             )}
           </main>
         </div>
+
+        {/* Community Guidelines & Policies Banner */}
+        <section className="mt-16 pt-8 border-t border-[var(--color-border)]/40">
+          <div className="bg-gradient-to-r from-[var(--color-bg-secondary)] to-[var(--color-bg-tertiary)]/30 border border-[var(--color-border)]/50 rounded-2xl p-6 sm:p-8 flex flex-col md:flex-row items-center justify-between gap-6 shadow-sm">
+            <div className="flex-1">
+              <div className="flex items-center gap-2.5 mb-2">
+                <span className="text-xl">🛡️</span>
+                <h3 className="text-lg font-bold text-[var(--color-text)]">Community Guidelines & Spam Policies</h3>
+              </div>
+              <p className="text-sm text-[var(--color-text-secondary)] leading-relaxed max-w-3xl">
+                To maintain a high-quality Q&A resource, all questions are filtered in real-time by AI spam guards. Please keep posts supportive, pick confidence levels honestly, and tag your questions correctly.
+              </p>
+            </div>
+            <Link href="/guidelines" className="btn-secondary whitespace-nowrap shrink-0">
+              Read Full Guidelines &rarr;
+            </Link>
+          </div>
+        </section>
       </div>
+
 
       {/* Add Category Modal */}
       {showCategoryModal && (

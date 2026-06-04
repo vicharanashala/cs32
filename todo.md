@@ -320,6 +320,10 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 4, 2026)
 
+1. **Policies and Community Guidelines Addition**
+   * *Request*: The user wanted to add community guidelines and platform policies to the main page and the footer.
+   * *Resolution*: Created a beautiful, dedicated `/guidelines` page detailing community respect rules, honest confidence levels, and anti-spam policies. Placed a prominent, styled guidelines banner at the bottom of the home page, and added a navigation link inside the website's bottom footer.
+
 1. **Instant Notification Read Sync & Global Badge Updates**
    * *Bug*: When users clicked on notification cards on the `/notifications` page, the notification was updated in the database but the local page state and global navbar badge did not update until a page refresh.
    * *Resolution*: Integrated the `useNotifications` global context into the notifications page. Configured a click handler on cards that updates the local state and unread count instantly, and redirects correctly without blocking. Prevented propagation on the archive button.
