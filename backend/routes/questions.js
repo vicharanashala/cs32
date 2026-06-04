@@ -6,6 +6,7 @@ const ctrl = require('../controllers/questionController');
 const { flagContent } = require('../services/moderationService');
 
 router.get('/similar', ctrl.findSimilar);
+router.post('/validate', optionalAuth, ctrl.validateQuestionText);
 router.get('/', optionalAuth, ctrl.getQuestions);
 router.get('/:id', optionalAuth, ctrl.getQuestion);
 router.get('/:id/similar', ctrl.getSimilarQuestions);

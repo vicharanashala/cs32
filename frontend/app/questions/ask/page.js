@@ -22,6 +22,8 @@ export default function AskQuestionPage() {
   const [alreadyAskedInfo, setAlreadyAskedInfo] = useState(null);
   const [titleSuggestions, setTitleSuggestions] = useState([]);
   const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+  const [titleWarning, setTitleWarning] = useState('');
+  const [bodyWarning, setBodyWarning] = useState('');
   const [draftSaved, setDraftSaved] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -109,6 +111,51 @@ export default function AskQuestionPage() {
     return () => document.removeEventListener('click', handleClickOutside);
   }, []);
 
+  // Real-time spam and gibberish validation
+  useEffect(() => {
+    if (!form.title && !form.body) {
+      setTitleWarning('');
+      setBodyWarning('');
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      // Validate Title
+      if (form.title && form.title.trim().length >= 5) {
+        try {
+          const res = await api.post('/questions/validate', { title: form.title });
+          if (!res.valid) {
+            setTitleWarning(res.reason || 'Gibberish or spam detected in title.');
+          } else {
+            setTitleWarning('');
+          }
+        } catch (_) {
+          setTitleWarning('');
+        }
+      } else {
+        setTitleWarning('');
+      }
+
+      // Validate Body
+      if (form.body && form.body.trim().replace(/<[^>]*>/g, '').length >= 10) {
+        try {
+          const res = await api.post('/questions/validate', { body: form.body });
+          if (!res.valid) {
+            setBodyWarning(res.reason || 'Gibberish or spam detected in body.');
+          } else {
+            setBodyWarning('');
+          }
+        } catch (_) {
+          setBodyWarning('');
+        }
+      } else {
+        setBodyWarning('');
+      }
+    }, 600); // 600ms debounce to avoid excessive calls
+
+    return () => clearTimeout(timer);
+  }, [form.title, form.body]);
+
   const addTag = (name) => {
     const t = name.toLowerCase().trim();
     if (t && !tags.includes(t) && tags.length < 5) {
@@ -123,8 +170,10 @@ export default function AskQuestionPage() {
     e.preventDefault();
     setError('');
     if (form.title.length < 10) { setError('Title must be at least 10 characters'); return; }
+    if (titleWarning) { setError(`Cannot post: ${titleWarning}`); return; }
     if (!form.category) { setError('Please select a category'); return; }
     if (form.body.replace(/<[^>]*>/g, '').length < 20) { setError('Body must be at least 20 characters'); return; }
+    if (bodyWarning) { setError(`Cannot post: ${bodyWarning}`); return; }
 
     setLoading(true);
     try {
@@ -167,10 +216,20 @@ export default function AskQuestionPage() {
               value={form.title}
               onChange={(e) => { setForm({ ...form, title: e.target.value }); setShowTitleSuggestions(true); }}
               onFocus={() => form.title.length >= 3 && titleSuggestions.length > 0 && setShowTitleSuggestions(true)}
-              className="input"
+              className={`input ${titleWarning ? 'border-amber-500 focus:ring-amber-500 bg-amber-50/10' : ''}`}
               placeholder="e.g. How do I use useEffect in React for data fetching?"
               maxLength={300}
             />
+            {titleWarning && (
+              <div className="mt-2 p-3 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg flex items-start gap-2 text-amber-800 dark:text-amber-400">
+                <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="text-xs">
+                  <span className="font-semibold">Quality Warning:</span> {titleWarning}
+                </div>
+              </div>
+            )}
             {showTitleSuggestions && titleSuggestions.length > 0 && (
               <div className="absolute z-20 w-full mt-1 bg-[var(--color-bg-secondary)] border border-[var(--color-border)] rounded-lg shadow-lg max-h-60 overflow-y-auto" onClick={(e) => e.stopPropagation()}>
                 <div className="px-3 py-2 text-xs text-[var(--color-text-secondary)] border-b border-[var(--color-border)]">Suggestions</div>
@@ -327,9 +386,19 @@ export default function AskQuestionPage() {
             <textarea
               value={form.body}
               onChange={(e) => setForm({ ...form, body: e.target.value })}
-              className="input min-h-[200px]"
+              className={`input min-h-[200px] ${bodyWarning ? 'border-amber-500 focus:ring-amber-500 bg-amber-50/10' : ''}`}
               placeholder="Describe your problem in detail..."
             />
+            {bodyWarning && (
+              <div className="mt-2 p-3 bg-amber-50/80 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-900/50 rounded-lg flex items-start gap-2 text-amber-800 dark:text-amber-400">
+                <svg className="w-5 h-5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div className="text-xs">
+                  <span className="font-semibold">Quality Warning:</span> {bodyWarning}
+                </div>
+              </div>
+            )}
           </div>
 
           <div>
