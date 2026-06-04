@@ -33,23 +33,50 @@ class SearchInput(BaseModel):
     query: str
     phase: str # Accepts "bronze", "silver", or "gold"
 
-# ENDPOINT 1: THE NOISE FILTER
+# ENDPOINT 1: THE PERFECT NOISE, TOXICITY & RELEVANCY FILTER
 @app.post("/api/v1/validate")
 def validate_user_question(data: QuestionInput):
     text = data.text.strip()
-    if len(text) < 8:
-        return {"valid": False, "reason": "Too short to be a valid question."}
+    
+    # 1. Structural Checks
+    if len(text) < 3: 
+        return {"valid": False, "reason": "Input is too short to be a valid question."}
     if re.search(r'(.)\1{4,}', text): 
         return {"valid": False, "reason": "Contains repeating gibberish characters."}
     
-    labels = ["meaningful question", "gibberish noise junk"]
+    # 2. Smart AI Categorization 
+    labels = [
+        "legitimate inquiry or help request", 
+        "toxic insult or abuse", 
+        "random keyboard smash or gibberish",
+        "irrelevant statement or meaningless text"
+    ]
     ai_result = classifier(text, candidate_labels=labels)
-    meaningful_score = ai_result['scores'][ai_result['labels'].index("meaningful question")]
     
-    if meaningful_score >= 0.85:
-        return {"valid": True, "reason": "Passes safety check."}
+    # The top scored label would be consider
+    top_label = ai_result['labels'][0]
+    
+    # 3. Decision Matrix 
+    
+    # CASE 1: Random keyboard smash (e.g., "hjsfgaydhshdb")
+    if top_label == "random keyboard smash or gibberish":
+        return {"valid": False, "reason": "Unreadable gibberish noise detected."}
+        
+    # CASE 2: Abuse or Trolling (e.g., "hell you are this")
+    elif top_label == "toxic insult or abuse":
+        return {"valid": False, "reason": "Inappropriate language or abusive behavior detected."}
+        
+    # CASE 3: Coherent but completely meaningless statements ("keepe I knew it to answer whom")
+    elif top_label == "irrelevant statement or meaningless text":
+        return {"valid": False, "reason": "Input is a random statement, not a valid FAQ question or request for help."}
+        
+    # CASE 4: Valid questions OR questions with broken grammar
+    elif top_label == "legitimate inquiry or help request":
+        # Check intent if the sentence
+        return {"valid": True, "reason": "Input accepted successfully."}
+        
     else:
-        return {"valid": False, "reason": "AI flagged this as unreadable noise."}
+        return {"valid": False, "reason": "Could not verify this input as a valid question."}
 
 # ENDPOINT 2: SMART INTENT SEARCH (Clean Recommendation Output)
 @app.post("/api/v1/search")
