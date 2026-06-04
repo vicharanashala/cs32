@@ -320,7 +320,14 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 4, 2026)
 
-1. **Policies and Community Guidelines Addition**
+1. **Admin Panel - Unban, Unsuspend, Unblock, and Un-Shadowban Controls**
+   * *Bug*: When an admin suspended, blocked, or shadow banned a user, their posts remained visible or stayed hidden with no option/buttons on the admin page to lift restrictions and restore user status or content visibility.
+   * *Resolution*:
+     1. Updated `moderationService.js` so that banning a user updates their status to `blocked` and automatically hides all their questions and answers (`visibility: 'hidden'`).
+     2. Updated `unbanUser` in `moderationService.js` and `moderateUser` in `adminController.js` to support `activate`, `unsuspend`, `unblock`, and `unshadow_ban` actions. This resets the user status to `active`, clears ban/suspension state, and restores all hidden posts back to `public` visibility.
+     3. Refactored the main Users list table in the admin panel (`frontend/app/admin/page.js`) to display the user's detailed status (Banned, Shadow Banned, Suspended, Warned, Active) and added buttons to Suspend, Shadow Ban, and "Activate / Unblock" directly.
+
+2. **Policies and Community Guidelines Addition**
    * *Request*: The user wanted to add community guidelines and platform policies to the main page and the footer.
    * *Resolution*: Created a beautiful, dedicated `/guidelines` page detailing community respect rules, honest confidence levels, and anti-spam policies. Placed a prominent, styled guidelines banner at the bottom of the home page, and added a navigation link inside the website's bottom footer.
 

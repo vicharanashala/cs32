@@ -350,8 +350,14 @@ export default function AdminPage() {
   };
 
   const handleUserAction = async (userId, action) => {
-    const reason = prompt(`Reason for user action "${action}":`);
-    if (reason === null) return;
+    let reason = '';
+    if (action !== 'activate') {
+      reason = prompt(`Reason for user action "${action}":`);
+      if (reason === null) return;
+    } else {
+      if (!confirm('Are you sure you want to lift all restrictions (unban/unblock/unsuspend/un-shadowban) for this user?')) return;
+      reason = 'Lifting restrictions';
+    }
     let durationHours = 0;
     if (action === 'suspend') {
       const hoursStr = prompt('Suspension duration in hours (default 24):', '24');
@@ -360,7 +366,7 @@ export default function AdminPage() {
     }
     try {
       await api.post('/admin/moderation/action', { userId, action, durationHours, reason });
-      toast.success(`Successfully applied action "${action}" to user`);
+      toast.success(action === 'activate' ? 'Successfully lifted all restrictions' : `Successfully applied action "${action}" to user`);
       fetchReportedPosts();
       fetchUsers();
     } catch (err) {
@@ -505,14 +511,43 @@ export default function AdminPage() {
                       </select>
                     </td>
                     <td className="px-4 py-3">
-                      {u.isBanned ? <span className="badge-red">Banned</span> : <span className="badge-green">Active</span>}
+                      {u.isBanned || u.status === 'blocked' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400">
+                          Banned / Blocked
+                        </span>
+                      ) : u.status === 'shadow_banned' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
+                          Shadow Banned
+                        </span>
+                      ) : u.status === 'suspended' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400">
+                          Suspended
+                        </span>
+                      ) : u.status === 'warned' ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
+                          Warned
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400">
+                          Active
+                        </span>
+                      )}
                     </td>
                     <td className="px-4 py-3 text-[var(--color-text-secondary)] text-xs">{formatDate(u.createdAt)}</td>
                     <td className="px-4 py-3 flex items-center gap-2">
-                      {u.isBanned ? (
-                        <button onClick={() => handleUnban(u._id)} className="btn-secondary btn-sm">Unban</button>
+                      {u.isBanned || u.status === 'blocked' || u.status === 'shadow_banned' || u.status === 'suspended' || u.status === 'warned' ? (
+                        <button
+                          onClick={() => handleUserAction(u._id, 'activate')}
+                          className="px-2.5 py-1.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-md transition-colors"
+                        >
+                          Activate / Unblock
+                        </button>
                       ) : (
-                        <button onClick={() => handleBan(u._id)} className="btn-danger btn-sm">Ban</button>
+                        <div className="flex gap-1">
+                          <button onClick={() => handleBan(u._id)} className="btn-danger btn-sm">Ban</button>
+                          <button onClick={() => handleUserAction(u._id, 'suspend')} className="px-2 py-1 bg-orange-500 hover:bg-orange-600 text-white rounded text-[10px] font-bold">Suspend</button>
+                          <button onClick={() => handleUserAction(u._id, 'shadow_ban')} className="px-2 py-1 bg-purple-600 hover:bg-purple-700 text-white rounded text-[10px] font-bold">Shadow Ban</button>
+                        </div>
                       )}
                       <button onClick={() => handleDeleteUser(u._id, u.username)} className="px-2.5 py-1.5 text-xs font-semibold text-white bg-red-600 hover:bg-red-700 rounded-md transition-colors">
                         Delete

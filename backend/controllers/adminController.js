@@ -686,6 +686,24 @@ exports.moderateUser = async (req, res, next) => {
       for (const qId of questionIds) {
         await recalculateAnswerCount(qId);
       }
+    } else if (action === 'activate' || action === 'unsuspend' || action === 'unblock' || action === 'unshadow_ban') {
+      targetUser.status = 'active';
+      targetUser.suspendedUntil = null;
+      targetUser.isBanned = false;
+      targetUser.banReason = null;
+      
+      // Restore all posts
+      await Question.updateMany({ author: targetUser._id, visibility: 'hidden' }, { visibility: 'public' });
+      
+      const Answer = require('../models/Answer');
+      const userAnswers = await Answer.find({ author: targetUser._id });
+      const questionIds = [...new Set(userAnswers.map(a => a.question.toString()))];
+      await Answer.updateMany({ author: targetUser._id, visibility: 'hidden' }, { visibility: 'public' });
+
+      const { recalculateAnswerCount } = require('../utils/helpers');
+      for (const qId of questionIds) {
+        await recalculateAnswerCount(qId);
+      }
     } else {
       throw new AppError('Invalid action', 400);
     }
