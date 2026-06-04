@@ -318,7 +318,38 @@ Medium-Impact Quality of Life
 
 ### Recent Fixes
 
+#### Latest Fixes (June 4, 2026)
+
+1. **Moderation Warning Banner — Shown to All Users Instead of Author Only**
+   * *Bug*: The "pending moderation" and "hidden" banners on question detail pages were shown to every visitor, not just the question author. Regular students could see "This question is pending moderation" even on questions that had already been answered.
+   * *Resolution*: Added guard condition so banners only render for the question author OR admin/moderator. Updated text to *"Your question is pending moderation. It will be visible to everyone once approved by a moderator."* — clearer and author-scoped.
+
+2. **Ask Question — "Failed to fetch" / "Request failed" Error with No Reason**
+   * *Bug*: When the spamGuard middleware blocked a post (missing category, cooldown, duplicate, rate limit), it returned `{ reason: "..." }`. But `frontend/lib/api.js` only read `data.error || data.message`, so the real reason was swallowed and the user just saw "Request failed".
+   * *Resolution*: Updated `api.js` error extraction to check `data.reason` first: `data.reason || data.error || data.message || 'Request failed'`. All spamGuard rejection reasons now display clearly in the UI toast.
+
+3. **Spam / Noise Questions — Silently Going to Pending Instead of Blocking**
+   * *Bug*: When the FastAPI AI microservice flagged a question title as spam/noise, the backend quietly set `visibility = 'pending'` and saved the question anyway. The user had no idea why their question vanished.
+   * *Resolution*: Changed to return HTTP 400 immediately with a clear message: *"Your question was flagged as spam or noise and is not allowed. Reason: ..."* — the post is never created, and the user sees the exact reason at the form level.
+
+4. **Notification Bell Missing from Navbar**
+   * *Bug*: The notification bell only existed in the profile dropdown menu, not in the top navbar. Users had no visible indicator of unread notifications without opening the menu.
+   * *Resolution*: Added a 🔔 bell icon with a live red badge (showing unread count, capped at 99+) to the Navbar between the "Ask Question" button and the avatar. Integrated `useNotifications()` hook. Badge auto-updates via Socket.IO `notification:new` events.
+
+5. **Socket.IO Connection Failing Through Next.js Proxy**
+   * *Bug*: Socket transport order was `['websocket', 'polling']` — WebSocket upgrades don't work through Next.js HTTP proxy rewrites, causing the socket to fail to connect and breaking all real-time notifications, leaderboard updates, and admin panel live sync.
+   * *Resolution*: Changed to `['polling', 'websocket']` (start with polling, upgrade when supported). Added explicit `path: '/socket.io'`, `reconnection: true`, `reconnectionAttempts: 5`, `reconnectionDelay: 2000ms`.
+
+6. **Gmail SMTP Authentication Failure — Space in App Password**
+   * *Bug*: `GMAIL_APP_PASSWORD=ncvg wyfztoseunmy` had a space in the middle. Google displays app passwords with spaces for readability, but SMTP authentication requires them without spaces. Every email send attempt was failing silently.
+   * *Resolution*: Fixed in `secrets.env`: `GMAIL_APP_PASSWORD=ncvgwyfztoseunmy`. EmailWorker will now successfully authenticate and send queued emails.
+
+7. **Avatar URL in Navbar Using Hardcoded Localhost**
+   * *Bug*: Avatar `<img>` src was constructed using `process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'` — on any host other than localhost, this produced a broken image URL.
+   * *Resolution*: Changed to use relative path `/api/uploads${user.avatar}` which works regardless of host.
+
 #### Latest Fixes (June 3, 2026)
+
 
 1. **Email Queue Worker — Module Resolution & Docker Volume Fix**
    * *Resolution*: `node-cron` module was missing from the backend Docker container's anonymous `node_modules` volume (old volume predated the new dependency). Installed `node-cron` directly into the live container via `docker exec -u root` and rebuilt the backend image so future containers have it baked in. The `[EmailWorker]` now initialises cleanly at startup.
