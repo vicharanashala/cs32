@@ -561,6 +561,7 @@ Medium-Impact Quality of Life
       * Created a dynamic `GET /api/app-version` backend API endpoint returning version metadata, changelog, and APK/installer links.
       * Built an `AppUpdateChecker` client component mounted in `PwaProvider` that checks the backend version from the Capacitor wrapper, comparing versionCode to trigger update modals or lockouts (`forceUpdate: true`).
       * Built a beautiful `/downloads` Download Center containing installation cards for PWA, Android (APK), Windows (.exe), and macOS (.dmg), linking it in the Footer.
+      * Populated public asset placeholders for the installer packages and documented MSVC compilation processes to replace placeholders with production builds.
 
 
 
