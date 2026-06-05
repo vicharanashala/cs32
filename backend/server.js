@@ -35,6 +35,17 @@ const categoryRoutes = require('./routes/categories');
 const app = express();
 const server = http.createServer(app);
 
+// Strip Vercel service route prefix if present
+app.use((req, res, next) => {
+  if (req.url && req.url.startsWith('/_/backend')) {
+    req.url = req.url.substring('/_/backend'.length);
+    if (!req.url.startsWith('/')) {
+      req.url = '/' + req.url;
+    }
+  }
+  next();
+});
+
 // Socket.IO
 setupSocket(server);
 
@@ -120,8 +131,20 @@ const startServer = async () => {
 };
 
 if (process.env.VERCEL) {
-  // Vercel: connect DB only — Vercel handles HTTP serving, no listen() needed
-  connectDB().catch(err => console.error('DB connection error on Vercel:', err));
+  // Vercel: connect DB and run seed check on container init
+  connectDB().then(async () => {
+    try {
+      const Category = require('./models/Category');
+      const count = await Category.countDocuments();
+      if (count === 0) {
+        console.log('MongoDB is empty. Seeding database on Vercel...');
+        const { seedDatabase } = require('./services/searchService');
+        await seedDatabase();
+      }
+    } catch (err) {
+      console.error('Seeding check failed on Vercel:', err.message);
+    }
+  }).catch(err => console.error('DB connection error on Vercel:', err));
 } else {
   startServer();
 }

@@ -140,7 +140,7 @@ exports.googleLogin = async (req, res, next) => {
         picture: `https://ui-avatars.com/api/?name=${email.split('@')[0]}`
       };
     } else {
-      const apiKey = process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
+      const apiKey = config.firebase?.apiKey || process.env.NEXT_PUBLIC_FIREBASE_API_KEY;
       if (apiKey) {
         try {
           const lookupResponse = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${apiKey}`, {
