@@ -12,6 +12,7 @@ import ReportIssueButton from '@/components/ReportIssueButton';
 import NetworkStatus from '@/components/NetworkStatus';
 import { Toaster } from 'react-hot-toast';
 import PwaProvider from '@/pwa/PwaProvider';
+import ErrorBoundary from '@/components/ErrorBoundary';
 
 export const metadata = {
   title: 'PrashnaSārathi - Community Q&A and FAQ Platform',
@@ -66,7 +67,9 @@ export default function RootLayout({ children }) {
                     <ReportIssueButton />
                     <NetworkStatus />
                     <main className="flex-1">
-                      {children}
+                      <ErrorBoundary>
+                        {children}
+                      </ErrorBoundary>
                     </main>
                     <Footer />
                   </PwaProvider>

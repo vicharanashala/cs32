@@ -1,5 +1,5 @@
-const CACHE_NAME = 'prashnasarathi-pwa-cache-v5';
-const DATA_CACHE_NAME = 'prashnasarathi-data-cache-v5';
+const CACHE_NAME = 'prashnasarathi-pwa-cache-v6';
+const DATA_CACHE_NAME = 'prashnasarathi-data-cache-v6';
 
 // Helper to fetch with a timeout fallback
 function fetchWithTimeout(request, timeout = 1000) {
@@ -152,8 +152,8 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Fallback if offline
-          return new Response('Offline asset not available', { status: 503, statusText: 'Offline' });
+          // Return a network error response so the browser handles it as a standard fetch failure (ChunkLoadError)
+          return Response.error();
         });
     })
   );
