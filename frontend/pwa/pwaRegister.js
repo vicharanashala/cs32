@@ -12,19 +12,6 @@ export function registerServiceWorker() {
           if ('Notification' in window && Notification.permission === 'default') {
             console.log('[PWA] Push notification support available.');
           }
-
-          // Monitor for updates and reload to apply changes
-          registration.addEventListener('updatefound', () => {
-            const newWorker = registration.installing;
-            if (newWorker) {
-              newWorker.addEventListener('statechange', () => {
-                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                  console.log('[PWA] New service worker version installed. Refreshing cache.');
-                  window.location.reload();
-                }
-              });
-            }
-          });
         })
         .catch((error) => {
           console.error('[PWA] Service Worker registration failed:', error);
