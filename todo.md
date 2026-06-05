@@ -513,6 +513,9 @@ Medium-Impact Quality of Life
    * *Resolution*: Updated the User Profile questions, answers, and saved list views to display absolute calendar dates instead of relative intervals (e.g. "Joined Jan 15, 2026" and "Answered Feb 10, 2026"). Ensured all relative time displays across the platform transition to absolute dates after 24 hours.
 3. **Public Verified Tag Indexing**
    * *Resolution*: Updated the MongoDB aggregation pipeline in `getTags` to filter tags so they are only displayed if they belong to at least one question with public visibility and an active admin/moderator verification timestamp (`lastVerifiedAt`).
+4. **Suggested Search Tag Removal & Mobile Layout Adaptability**
+   * *Resolution*: Removed the "Suggested" category chips under the main search input to simplify the interface. Redesigned the category navigation sidebar to display as a horizontal swiping strip (`overflow-x-auto`) on mobile devices, ensuring it takes up negligible vertical height, while maintaining the sticky vertical sidebar layout on desktop resolutions.
+
 
 #### Latest Fixes (June 2, 2026)
 
