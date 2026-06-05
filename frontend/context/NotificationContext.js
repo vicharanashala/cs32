@@ -69,6 +69,11 @@ export function NotificationProvider({ children }) {
     };
 
     const handleAdminAlert = (data) => {
+      // Ignore alert if it was sent by this user
+      if (user && (user._id === data.senderId || user.id === data.senderId)) {
+        return;
+      }
+
       // Immediately trigger a refetch so the new system broadcast is synced down
       fetchNotificationsList();
       

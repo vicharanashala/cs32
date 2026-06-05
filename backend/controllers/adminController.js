@@ -973,8 +973,8 @@ exports.sendAdminAlert = async (req, res, next) => {
     const Notification = require('../models/Notification');
     const { broadcastAlert } = require('../socket');
 
-    // 1. Get all active, non-banned users
-    const users = await User.find({ isBanned: false }).select('_id');
+    // 1. Get all active, non-banned users (excluding the sender)
+    const users = await User.find({ _id: { $ne: req.user._id }, isBanned: false }).select('_id');
     
     // 2. Create system notifications in batch
     if (users.length > 0) {
@@ -993,6 +993,7 @@ exports.sendAdminAlert = async (req, res, next) => {
       broadcastAlert('admin:alert', {
         title: 'Admin Alert',
         message,
+        senderId: req.user._id.toString(),
         createdAt: new Date()
       });
     } catch (socketErr) {
