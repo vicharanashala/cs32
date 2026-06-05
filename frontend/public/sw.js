@@ -1,5 +1,5 @@
-const CACHE_NAME = 'prashnasarathi-pwa-cache-v6';
-const DATA_CACHE_NAME = 'prashnasarathi-data-cache-v6';
+const CACHE_NAME = 'prashnasarathi-pwa-cache-v7';
+const DATA_CACHE_NAME = 'prashnasarathi-data-cache-v7';
 
 // Helper to fetch with a timeout fallback
 function fetchWithTimeout(request, timeout = 1000) {
@@ -24,6 +24,7 @@ function fetchWithTimeout(request, timeout = 1000) {
 // Static files to cache immediately on install
 const STATIC_ASSETS = [
   '/',
+  '/offline.html',
   '/faqs',
   '/questions',
   '/guidelines',
@@ -121,11 +122,8 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Fallback if offline
-          return caches.match(request).then((res) => {
-            if (res) return res;
-            return caches.match('/', { ignoreSearch: true });
-          });
+          // Serve the static offline page if the user is offline
+          return caches.match('/offline.html');
         })
     );
     return;
