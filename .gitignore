@@ -70,3 +70,9 @@ __pycache__/
 .pytest_cache/
 venv/
 .venv/
+
+# Capacitor and Desktop App Build folders
+capacitor-app/android/
+desktop-app/dist/
+desktop-app/node_modules/
+

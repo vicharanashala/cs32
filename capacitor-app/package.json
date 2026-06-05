@@ -19,6 +19,7 @@
     "@capacitor/splash-screen": "^6.0.1"
   },
   "devDependencies": {
-    "cordova-res": "^0.15.4"
+    "cordova-res": "^0.15.4",
+    "typescript": "^6.0.3"
   }
 }

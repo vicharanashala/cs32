@@ -128,21 +128,20 @@ export default function DownloadCenter() {
                 </div>
                 <div>
                   <h2 className="text-base font-bold text-[var(--color-text)]">iOS Application</h2>
-                  <p className="text-xs text-[var(--color-text-secondary)]">Apple IPA Package</p>
+                  <p className="text-xs text-[var(--color-text-secondary)]">Safari PWA Install</p>
                 </div>
               </div>
               <p className="text-xs text-[var(--color-text-secondary)] leading-relaxed">
-                Native iOS app built using Capacitor. Sideloadable via AltStore, TestFlight, or enterprise compiler signing profiles.
+                Install directly on your iPhone or iPad without any third-party app stores or sideloading tools.
               </p>
             </div>
-            <div className="mt-6">
-              <a
-                href="/downloads/prashnasarathi-app.ipa"
-                download
-                className="w-full py-2.5 text-xs font-semibold text-white bg-blue-500 hover:bg-blue-600 rounded-xl transition-all shadow-md shadow-blue-500/10 cursor-pointer flex items-center justify-center gap-1.5"
-              >
-                Download IPA
-              </a>
+            <div className="mt-6 border border-dashed border-blue-500/30 rounded-xl p-3 bg-blue-500/5">
+              <h3 className="text-xs font-semibold text-blue-400 mb-1">How to Install on iOS:</h3>
+              <ol className="text-[10px] text-[var(--color-text-secondary)] list-decimal list-inside space-y-1">
+                <li>Open this site in <strong>Safari</strong></li>
+                <li>Tap the <strong>Share</strong> button (bottom bar)</li>
+                <li>Scroll down and tap <strong>Add to Home Screen</strong></li>
+              </ol>
             </div>
           </div>
 
