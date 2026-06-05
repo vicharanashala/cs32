@@ -6,6 +6,7 @@ function createWindow() {
     width: 1020,
     height: 768,
     title: "PrashnaSārathi",
+    icon: path.join(__dirname, 'logo.png'),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true
