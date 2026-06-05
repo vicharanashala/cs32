@@ -4,15 +4,34 @@ import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
 import toast from 'react-hot-toast';
 import api from '@/lib/api';
+import AdminAlertModal from '@/components/AdminAlertModal';
 
 const NotificationContext = createContext(null);
 
 export function NotificationProvider({ children }) {
   const { user } = useAuth();
   const socket = useSocket();
+  const [notifications, setNotifications] = useState([]);
+  const [unreadAdminAlerts, setUnreadAdminAlerts] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [browserPermission, setBrowserPermission] = useState('default');
   const [isPushEnabled, setIsPushEnabled] = useState(false);
+
+  const fetchNotificationsList = useCallback(async () => {
+    if (!user) return;
+    try {
+      const data = await api.get('/notifications');
+      const list = data.notifications || [];
+      setNotifications(list);
+      setUnreadCount(data.unreadCount || 0);
+
+      // Extract unread system admin alerts
+      const alerts = list.filter(n => n.type === 'system' && n.title === 'Admin Alert' && !n.isRead);
+      setUnreadAdminAlerts(alerts);
+    } catch (err) {
+      console.error('Failed to fetch notifications:', err);
+    }
+  }, [user]);
 
   useEffect(() => {
     if ('Notification' in window) {
@@ -29,17 +48,20 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     if (!user) {
       setUnreadCount(0);
+      setNotifications([]);
+      setUnreadAdminAlerts([]);
       setIsPushEnabled(false);
       return;
     }
 
-    fetchUnreadCount();
+    fetchNotificationsList();
     checkPushSubscription();
 
     if (!socket) return;
 
     const handleNotification = (data) => {
-      setUnreadCount(prev => prev + 1);
+      // Fetch latest notifications to keep the state perfectly synced with real DB IDs
+      fetchNotificationsList();
       
       if (browserPermission === 'granted') {
         showBrowserNotification(data);
@@ -47,35 +69,10 @@ export function NotificationProvider({ children }) {
     };
 
     const handleAdminAlert = (data) => {
-      toast((t) => (
-        <div className="flex flex-col gap-2 p-1 text-left">
-          <div className="font-bold text-red-600 dark:text-red-400 flex items-center gap-1.5 text-sm">
-            <span>🚨</span> SYSTEM ALERT
-          </div>
-          <div className="text-sm text-[var(--color-text)] leading-relaxed">
-            {data.message}
-          </div>
-          <button 
-            onClick={() => toast.dismiss(t.id)} 
-            className="mt-2 px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-semibold self-end transition-all shadow-sm"
-          >
-            Dismiss
-          </button>
-        </div>
-      ), {
-        duration: Infinity,
-        position: 'top-center',
-        style: {
-          border: '1px solid var(--color-border)',
-          background: 'var(--color-bg-secondary)',
-          color: 'var(--color-text)',
-          minWidth: '320px',
-          boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-        }
-      });
-
-      setUnreadCount(prev => prev + 1);
+      // Immediately trigger a refetch so the new system broadcast is synced down
+      fetchNotificationsList();
       
+      // Also trigger browser notification
       if (browserPermission === 'granted') {
         showBrowserNotification({
           title: 'System Alert',
@@ -91,7 +88,7 @@ export function NotificationProvider({ children }) {
       socket.off('notification:new', handleNotification);
       socket.off('admin:alert', handleAdminAlert);
     };
-  }, [user, socket, browserPermission]);
+  }, [user, socket, browserPermission, fetchNotificationsList]);
 
   const checkPushSubscription = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -100,13 +97,6 @@ export function NotificationProvider({ children }) {
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       setIsPushEnabled(!!subscription);
-    } catch (_) {}
-  };
-
-  const fetchUnreadCount = async () => {
-    try {
-      const data = await api.get('/notifications/unread-count');
-      setUnreadCount(data.count || 0);
     } catch (_) {}
   };
 
@@ -208,20 +198,38 @@ export function NotificationProvider({ children }) {
   const markAsRead = useCallback(async (ids) => {
     try {
       await api.put('/notifications/read', { ids });
-      setUnreadCount(prev => Math.max(0, prev - (ids?.length || prev)));
+      setNotifications(prev =>
+        prev.map(n => ids.includes(n._id) ? { ...n, isRead: true } : n)
+      );
+      setUnreadCount(prev => Math.max(0, prev - ids.length));
+      setUnreadAdminAlerts(prev => prev.filter(n => !ids.includes(n._id)));
     } catch (_) {}
   }, []);
 
   const markAllRead = useCallback(async () => {
     try {
       await api.put('/notifications/read');
+      setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
+      setUnreadAdminAlerts([]);
     } catch (_) {}
   }, []);
+
+  const archiveNotification = useCallback(async (id) => {
+    try {
+      await api.put(`/notifications/${id}/archive`);
+      setNotifications(prev => prev.filter(n => n._id !== id));
+      setUnreadAdminAlerts(prev => prev.filter(n => n._id !== id));
+      // Re-fetch count/details
+      fetchNotificationsList();
+    } catch (_) {}
+  }, [fetchNotificationsList]);
 
   return (
     <NotificationContext.Provider value={{
       unreadCount,
+      notifications,
+      unreadAdminAlerts,
       browserPermission,
       isPushEnabled,
       requestBrowserPermission,
@@ -229,9 +237,11 @@ export function NotificationProvider({ children }) {
       unsubscribeFromPush,
       markAsRead,
       markAllRead,
-      refreshUnreadCount: fetchUnreadCount,
+      archiveNotification,
+      refreshNotifications: fetchNotificationsList,
     }}>
       {children}
+      <AdminAlertModal />
     </NotificationContext.Provider>
   );
 }

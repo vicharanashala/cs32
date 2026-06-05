@@ -356,6 +356,14 @@ Medium-Impact Quality of Life
    * *Problem*: Unused, empty, or unverified tags (without any associated public/approved questions) were cluttered on the tags page.
    * *Resolution*: Refactored `getTags` in `backend/controllers/tagController.js` to run a MongoDB aggregation pipeline on `Question`. It now aggregates question counts per tag and filters out any tags that do not have at least one public, approved, and non-deleted question.
 
+7. **Real-time Notifications Updates & Global Persistent Broadcast Modals**
+   * *Problem*: The notifications list on the `/notifications` page required manual page refreshes to display new notifications. Additionally, broadcast alerts sent when a user was offline were not shown on the main screen upon login, and the real-time popup could be dismissed without verifying if it was read.
+   * *Resolution*:
+     * Refactored `NotificationContext.js` to manage a unified `notifications` and `unreadAdminAlerts` state globally.
+     * Updated the Socket.IO listener within the context to trigger a live database fetch whenever `notification:new` or `admin:alert` events are received, instantly synchronizing notification count and lists in real-time.
+     * Rewrote `frontend/app/notifications/page.js` to dynamically consume this shared global context, enabling instant visual updates without page refreshes.
+     * Developed `AdminAlertModal.js`, a premium overlay displayed on the main screen of any active page when there are unread system admin alerts. This ensures that offline users are immediately presented with broadcast alerts upon logging in, and online users receive the modal instantly on their screens. Clicking the acknowledgment button updates the database to mark the alerts as read.
+
 #### Latest Fixes (June 4, 2026)
 
 1. **Moderation Platform Anomalies, Suspicious Activities, and Auditing Optimization**
