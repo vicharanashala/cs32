@@ -519,6 +519,9 @@ Medium-Impact Quality of Life
    * *Resolution*: Fixed the issue where refreshing pages (like `/admin`, `/questions/ask`, or `/saved`) redirected the logged-in user to the homepage or login screen. Added verification of the `authLoading` state before applying any redirect checks, ensuring the current path is preserved during page reloads.
 6. **Moderation Status Change Email Notifications**
    * *Resolution*: Added automated email notifications for when users are warned, suspended, shadow-banned, banned, or re-activated. Integrated the email trigger hooks into both `exports.banUser` and `exports.moderateUser` in `backend/controllers/adminController.js`, utilizing Nodemailer and the database queue.
+7. **Official Logo Integration & Premium HTML Email Templates**
+   * *Resolution*: Replaced the temporary inline SVG logo on the navbar with the official illustration logo (`logo.png`). Built a premium HTML email notification template wrapper in `backend/utils/emailTemplate.js` and updated the email queue worker to attach the logo as an inline CID resource (`cid:logo`), ensuring proper display in email clients.
+
 
 
 
