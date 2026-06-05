@@ -16,6 +16,8 @@ export default function Footer() {
           <Link href="/users" className="hover:text-[var(--color-primary)] transition-colors">Community</Link>
           <span className="text-[var(--color-text-muted)] hidden md:inline">•</span>
           <Link href="/guidelines" className="hover:text-[var(--color-primary)] transition-colors">Guidelines</Link>
+          <span className="text-[var(--color-text-muted)] hidden md:inline">•</span>
+          <Link href="/downloads" className="hover:text-[var(--color-primary)] transition-colors font-semibold text-emerald-500">Download App</Link>
         </div>
         <div className="text-[var(--color-text-muted)] text-center md:text-right font-mono">
           &copy; {new Date().getFullYear()} · Open source project
