@@ -67,7 +67,7 @@ export default function NetworkStatus() {
           setStatus('slow');
         }
       }
-    }, 30000);
+    }, 5000);
 
     return () => {
       window.removeEventListener('online', checkNetwork);

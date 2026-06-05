@@ -1,5 +1,5 @@
-const CACHE_NAME = 'prashnasarathi-pwa-cache-v3';
-const DATA_CACHE_NAME = 'prashnasarathi-data-cache-v3';
+const CACHE_NAME = 'prashnasarathi-pwa-cache-v4';
+const DATA_CACHE_NAME = 'prashnasarathi-data-cache-v4';
 
 // Helper to fetch with a timeout fallback
 function fetchWithTimeout(request, timeout = 1000) {
