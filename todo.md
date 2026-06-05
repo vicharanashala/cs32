@@ -535,16 +535,24 @@ Medium-Impact Quality of Life
      * Added a visual "Owner" badge beside the owner account in both profile and admin pages.
      * Formatted the sent time in both HTML and plain-text email notifications to explicitly use India Standard Time (`Asia/Kolkata` with `hour12: true`) and append the `IST` timezone identifier, preventing timezone discrepancies on the hosting servers.
 
-10. **PWA Conversion & Offline/Responsive Capabilities**
+10. **PWA Conversion, Offline Stabilization & Performance**
     * *Resolution*:
       * Structured a new `frontend/pwa` directory to isolate PWA states, hooks, and providers.
       * Built a custom React hook `usePWA` to track installation availability (`beforeinstallprompt`), app-installed state, and connectivity status.
       * Integrated the PWA installation option directly inside the responsive `Navbar` (in both the main header for desktop users and the hamburger menu for mobile users), removing the floating prompt banner for a cleaner interface.
       * Formatted and generated standard PWA icon files (72x72 through 512x512) and native iOS/iPadOS splash screen files.
-      * Integrated beautiful, system-wide connection status pop-up toasts (`react-hot-toast`) inside the robust, active-pinging `NetworkStatus` component to notify users instantly when going online, offline, or experiencing slow connections. Refined the state setup to initialize dynamically using `navigator.onLine` and enhanced the fetch catch block to capture general connection failures.
-      * Pre-fetched core API endpoints (such as FAQs and default sorted Questions lists) inside the `PwaProvider` mount phase to populate the Service Worker data cache while online, guaranteeing instant data loading when navigating offline.
-      * Developed a unified Service Worker (`sw.js`) utilizing static caching and a 1000ms fetch timeout fallback for dynamic API calls. If the connection fails or lags, it aborts the network request after 1 second and instantly serves cached FAQs and questions, avoiding long-hanging skeleton screens.
-      * Configured the app router manifest and apple-touch startup images metadata inside the root layout.
+      * Integrated beautiful, system-wide connection status pop-up toasts (`react-hot-toast`) inside the robust, active-pinging `NetworkStatus` component to notify users instantly when going online, offline, or experiencing slow connections.
+      * Added a Node.js build compilation script (`scripts/build-sw.js`) that automatically parses Next.js manifests, extracts all dynamic JavaScript/CSS chunks, and injects them into the Service Worker's `STATIC_ASSETS` array to guarantee 100% of resources are pre-cached offline.
+      * Pre-cached the core backend API endpoints (`/api/faqs`, `/api/questions`, etc.) directly on Service Worker install to ensure the application loads dynamic questions and FAQs instantly offline.
+      * Restored native Next.js client-side routing by removing the hard navigation click interceptor. This makes tab transitions between Questions, FAQs, and Profiles instantaneous and completely lag-free offline.
+      * Replaced the standard browser navigation load with `fetchWithTimeout(request, 1500)`. If offline or on flaky connections, it aborts the network load after 1.5 seconds and immediately serves the cached page shell, removing startup screen delays.
+
+11. **Capacitor Android Native Application Wrapper**
+    * *Resolution*:
+      * Created a dedicated `capacitor-app/` folder for native app configurations.
+      * Generated `capacitor.config.ts` specifying package name `com.prashnasarathi.app`, app name `PrashnaSārathi`, and linking to the live website host `https://prashnasarathi.vercel.app` to retain dynamic SSR/OAuth features.
+      * Configured essential Capacitor plugins including `SplashScreen`, `PushNotifications`, `Camera` (for profile pictures), `App` (for deep linking), and file uploads.
+      * Documented native integration setup instructions, required npm packages, build commands, and `AndroidManifest.xml` permissions/intent-filter configurations in a detailed walkthrough.
 
 
 
