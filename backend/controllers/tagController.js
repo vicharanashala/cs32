@@ -9,7 +9,8 @@ exports.getTags = async (req, res, next) => {
       {
         $match: {
           visibility: 'public',
-          isDeleted: false
+          isDeleted: false,
+          lastVerifiedAt: { $exists: true, $ne: null }
         }
       },
       {

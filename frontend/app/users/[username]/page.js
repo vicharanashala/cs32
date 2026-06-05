@@ -249,7 +249,7 @@ export default function UserProfilePage() {
           </div>
         ) : (
           <div className="space-y-4">
-            {questions.map(q => <QuestionCard key={q._id} question={q} />)}
+            {questions.map(q => <QuestionCard key={q._id} question={q} absoluteDate={true} />)}
           </div>
         )
       ) : tab === 'answers' ? (
@@ -270,7 +270,7 @@ export default function UserProfilePage() {
                   <span className="text-xs text-[var(--color-text-muted)]">{answer.upvotes || 0} votes</span>
                 </div>
                 <p className="text-sm text-[var(--color-text-secondary)] line-clamp-3 leading-relaxed">{answer.body?.slice(0, 300)}</p>
-                <p className="text-[10px] text-[var(--color-text-muted)] mt-3">Answered {formatDate(answer.createdAt)}</p>
+                <p className="text-[10px] text-[var(--color-text-muted)] mt-3">Answered {formatDate(answer.createdAt, true)}</p>
               </Link>
             ))}
           </div>
@@ -307,7 +307,7 @@ export default function UserProfilePage() {
             ) : (
               <div className="space-y-4">
                 {savedQuestions.map(item => (
-                  <QuestionCard key={item._id} question={item.question} />
+                  <QuestionCard key={item._id} question={item.question} absoluteDate={true} />
                 ))}
               </div>
             )

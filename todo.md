@@ -505,6 +505,15 @@ Medium-Impact Quality of Life
 10. **Question Answer Count Synchronization**
     * *Resolution*: Introduced the helper `recalculateAnswerCount()` and integrated it into all moderation pipelines (such as blocking users, shadow banning users, deleting users, or rejecting/deleting answers) to prevent the "answers count mismatch" bug where question statistics display more answers than actually exist.
 
+#### Latest Fixes (June 5, 2026)
+
+1. **Linear/GitHub-inspired FAQ Homepage Redesign**
+   * *Resolution*: Refactored the core FAQ portal homepage to use the standardized 'Linear/GitHub-inspired' design tokens. Built a sticky category sidebar, integrated Ctrl+K keyboard shortcut search discoverability, and converted the FAQ display list into dynamic, CSS grid-based accordions with Expand/Collapse All controls.
+2. **Absolute Profile Dates & 24-Hour Time Thresholds**
+   * *Resolution*: Updated the User Profile questions, answers, and saved list views to display absolute calendar dates instead of relative intervals (e.g. "Joined Jan 15, 2026" and "Answered Feb 10, 2026"). Ensured all relative time displays across the platform transition to absolute dates after 24 hours.
+3. **Public Verified Tag Indexing**
+   * *Resolution*: Updated the MongoDB aggregation pipeline in `getTags` to filter tags so they are only displayed if they belong to at least one question with public visibility and an active admin/moderator verification timestamp (`lastVerifiedAt`).
+
 #### Latest Fixes (June 2, 2026)
 
 1. **Firebase Admin User Synchronization & Real-time Pruning**
