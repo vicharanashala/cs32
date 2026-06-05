@@ -94,6 +94,16 @@ exports.banUser = async (req, res, next) => {
     await banUser({ userId: req.params.id, reason: reason || 'Violation of terms' });
 
     try {
+      const targetUser = await User.findById(req.params.id);
+      if (targetUser && targetUser.email) {
+        const { sendUserBlockedNotification } = require('../services/emailService');
+        await sendUserBlockedNotification(targetUser, reason || 'Violation of terms');
+      }
+    } catch (emailErr) {
+      console.error('Failed to send block email in banUser:', emailErr.message);
+    }
+
+    try {
       const { emitToAdmin } = require('../socket');
       emitToAdmin('moderation:updated', { action: 'ban_user', userId: req.params.id });
       const { broadcastLeaderboard } = require('../services/leaderboardService');
@@ -742,14 +752,24 @@ exports.moderateUser = async (req, res, next) => {
 
     await targetUser.save();
 
-    // Send user blocked email notification only if blocked
+    // Send relevant email notifications based on action
     try {
-      if (targetUser.email && action === 'block') {
-        const { sendUserBlockedNotification } = require('../services/emailService');
-        await sendUserBlockedNotification(targetUser, reason);
+      if (targetUser.email) {
+        const emailService = require('../services/emailService');
+        if (action === 'block') {
+          await emailService.sendUserBlockedNotification(targetUser, reason);
+        } else if (action === 'suspend') {
+          await emailService.sendUserSuspendedNotification(targetUser, durationHours || 24, reason);
+        } else if (action === 'warn') {
+          await emailService.sendUserWarnedNotification(targetUser, reason);
+        } else if (action === 'shadow_ban') {
+          await emailService.sendUserShadowBannedNotification(targetUser, reason);
+        } else if (['activate', 'unsuspend', 'unblock', 'unshadow_ban'].includes(action)) {
+          await emailService.sendUserActivatedNotification(targetUser);
+        }
       }
     } catch (emailErr) {
-      console.error('Failed to send block email:', emailErr.message);
+      console.error(`Failed to send ${action} email:`, emailErr.message);
     }
 
     // Audit Log
