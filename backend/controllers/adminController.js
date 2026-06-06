@@ -1037,6 +1037,21 @@ exports.sendAdminAlert = async (req, res, next) => {
       console.error('Socket broadcast failed for admin alert:', socketErr.message);
     }
 
+    // 3b. Broadcast push notifications to all apps (even if closed)
+    try {
+      const { broadcastPushNotification } = require('../services/pushService');
+      broadcastPushNotification({
+        title: 'Admin Alert',
+        body: message,
+        data: {
+          link: '/notifications',
+          type: 'system'
+        }
+      });
+    } catch (pushErr) {
+      console.error('Push broadcast failed for admin alert:', pushErr.message);
+    }
+
     // 4. Also audit log this action
     const AuditLog = require('../models/AuditLog');
     await AuditLog.create({

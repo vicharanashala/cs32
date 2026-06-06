@@ -39,3 +39,38 @@ exports.deletePushSubscription = async (req, res, next) => {
     next(err);
   }
 };
+
+exports.saveFcmToken = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, {
+      $addToSet: { fcmTokens: token },
+      'preferences.pushNotifications': true,
+    });
+
+    res.json({ message: 'FCM token saved' });
+  } catch (err) {
+    next(err);
+  }
+};
+
+exports.deleteFcmToken = async (req, res, next) => {
+  try {
+    const { token } = req.body;
+    if (!token) {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+
+    await User.findByIdAndUpdate(req.user._id, {
+      $pull: { fcmTokens: token }
+    });
+
+    res.json({ message: 'FCM token removed' });
+  } catch (err) {
+    next(err);
+  }
+};

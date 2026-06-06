@@ -55,7 +55,12 @@ export function NotificationProvider({ children }) {
     }
 
     fetchNotificationsList();
-    checkPushSubscription();
+
+    if (typeof window !== 'undefined' && window.Capacitor) {
+      registerCapacitorPush();
+    } else {
+      checkPushSubscription();
+    }
 
     if (!socket) return;
 
@@ -94,6 +99,54 @@ export function NotificationProvider({ children }) {
       socket.off('admin:alert', handleAdminAlert);
     };
   }, [user, socket, browserPermission, fetchNotificationsList]);
+
+  const registerCapacitorPush = async () => {
+    if (typeof window === 'undefined' || !window.Capacitor) return;
+    try {
+      const { PushNotifications } = await import('@capacitor/push-notifications');
+
+      let permStatus = await PushNotifications.checkPermissions();
+      if (permStatus.receive === 'prompt') {
+        permStatus = await PushNotifications.requestPermissions();
+      }
+
+      if (permStatus.receive !== 'granted') {
+        console.warn('Native push notification permission was not granted');
+        return;
+      }
+
+      await PushNotifications.register();
+
+      // Clear existing listeners to prevent duplicates
+      await PushNotifications.removeAllListeners();
+
+      PushNotifications.addListener('registration', async (token) => {
+        console.log('Capacitor FCM Registration successful, token:', token.value);
+        try {
+          await api.post('/notifications/push/fcm-token', { token: token.value });
+          setIsPushEnabled(true);
+        } catch (err) {
+          console.error('Failed to send FCM token to backend:', err);
+        }
+      });
+
+      PushNotifications.addListener('registrationError', (error) => {
+        console.error('Capacitor registration error:', error);
+      });
+
+      PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        console.log('Push notification received: ', notification);
+        fetchNotificationsList();
+      });
+
+      PushNotifications.addListener('pushNotificationActionPerformed', (notification) => {
+        console.log('Push notification action performed: ', notification);
+      });
+
+    } catch (err) {
+      console.error('Failed to register Capacitor push notifications:', err);
+    }
+  };
 
   const checkPushSubscription = async () => {
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
@@ -134,6 +187,11 @@ export function NotificationProvider({ children }) {
   };
 
   const subscribeToPush = useCallback(async () => {
+    if (typeof window !== 'undefined' && window.Capacitor) {
+      await registerCapacitorPush();
+      return;
+    }
+
     if (!('serviceWorker' in navigator) || !('PushManager' in window)) {
       toast.error('Push notifications not supported');
       return;
@@ -168,6 +226,13 @@ export function NotificationProvider({ children }) {
 
   const unsubscribeFromPush = useCallback(async () => {
     try {
+      if (typeof window !== 'undefined' && window.Capacitor) {
+        await api.delete('/notifications/push/unsubscribe');
+        setIsPushEnabled(false);
+        toast.success('Push notifications disabled');
+        return;
+      }
+
       const registration = await navigator.serviceWorker.ready;
       const subscription = await registration.pushManager.getSubscription();
       
@@ -185,6 +250,11 @@ export function NotificationProvider({ children }) {
   }, []);
 
   const requestBrowserPermission = useCallback(async () => {
+    if (typeof window !== 'undefined' && window.Capacitor) {
+      await registerCapacitorPush();
+      return;
+    }
+
     if (!('Notification' in window)) {
       toast.error('Browser notifications not supported');
       return;

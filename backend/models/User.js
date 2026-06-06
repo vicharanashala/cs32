@@ -96,6 +96,7 @@ const userSchema = new mongoose.Schema({
   ipHistory: [{ type: String }],
   deviceFingerprints: [{ type: String }],
   premodApproved: { type: Boolean, default: false },
+  fcmTokens: [{ type: String }],
 }, { timestamps: true });
 
 userSchema.index({ username: 'text', displayName: 'text', bio: 'text' });
