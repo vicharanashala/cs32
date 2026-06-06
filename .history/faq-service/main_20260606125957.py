@@ -9,7 +9,7 @@ from shield import is_structural_garbage
 # 1. Initialize FastAPI App
 app = FastAPI(title="Smart FAQ Microservice")
 
-# 2. Load AI Models at Startup
+# 2. Load Free AI Models at Startup
 print("Loading Noise Filter AI...")
 classifier = pipeline("zero-shot-classification", model="valhalla/distilbart-mnli-12-1")
 
@@ -24,7 +24,7 @@ faq_database = [
     {"question": "How do I set up a CI/CD pipeline?", "answer": "Use GitHub Actions with workflow YAML files.", "phase": "gold"}
 ]
 
-# Pre-calculate reference math vectors
+# FIX: Extract only the text questions for the AI to calculate math vectors
 faq_embeddings = search_model.encode([faq["question"] for faq in faq_database], convert_to_tensor=True)
 
 class QuestionInput(BaseModel):
@@ -32,7 +32,7 @@ class QuestionInput(BaseModel):
 
 class SearchInput(BaseModel):
     query: str
-    phase: str 
+    phase: str # Accepts "bronze", "silver", or "gold"
 
 # ENDPOINT 1: THE PERFECT NOISE, TOXICITY & RELEVANCY FILTER
 @app.post("/api/v1/validate")
@@ -57,53 +57,55 @@ def validate_user_question(data: QuestionInput):
     # 3. Decision Matrix
     if top_label == "random keyboard smash or gibberish":
         return {"valid": False, "reason": "Unreadable gibberish noise detected."}
+        
     elif top_label == "toxic insult or abuse":
         return {"valid": False, "reason": "Inappropriate language or abusive behavior detected."}
+        
     elif top_label == "irrelevant statement or meaningless text":
         return {"valid": False, "reason": "Input is a random statement, not a valid FAQ question or request for help."}
+        
     elif top_label == "legitimate inquiry or help request":
         return {"valid": True, "reason": "Input accepted successfully."}
+        
     else:
         return {"valid": False, "reason": "Could not verify this input as a valid question."}
 
-
-# ENDPOINT 2: SMART INTENT SEARCH (Actual Vector Slicing Logic)
+# ENDPOINT 2: SMART INTENT SEARCH (Clean Recommendation Output)
 @app.post("/api/v1/search")
-def smart_intent_search(data: SearchInput):
-    query = data.query.strip()
-    user_phase = data.phase.lower()
+def test_search_successful_gold_phase():
+    """Verifies valid phase-aware queries pass the 0.45 threshold loop."""
+    payload = {
+        "query": "How do I deploy docker container on AWS?",
+        "phase": "Gold"
+    }
+    response = client.post("/api/v1/search", json=payload)
+    assert response.status_code == 200
     
-    # 1. Map hierarchy tiers
-    allowed_phases = ["bronze"]
-    if user_phase == "silver":
-        allowed_phases = ["bronze", "silver"]
-    elif user_phase == "gold":
-        allowed_phases = ["bronze", "silver", "gold"]
+    data = response.json()
+    # Unpack the recommendations wrapper
+    assert "recommendations" in data
+    results = data["recommendations"]
+    assert isinstance(results, list)
+    
+    # Verify math threshold and index mapping integrity
+    for item in results:
+        score = item.get("similarity_score") or item.get("score")
+        assert score >= 0.45, f"Threshold breach! Found score: {score}"
+        assert "faq_id" in item or "id" in item
 
-    # 2. Find matching indices
-    matched_indices = [i for i, faq in enumerate(faq_database) if faq["phase"] in allowed_phases]
-    if not matched_indices:
-        return {"recommendations": []}
-        
-    # 3. Optimized Tensor Slicing & Matching
-    sliced_embeddings = faq_embeddings[matched_indices]
-    query_embedding = search_model.encode(query, convert_to_tensor=True)
-    cos_scores = util.cos_sim(query_embedding, sliced_embeddings)[0]
+
+def test_search_gated_by_strict_threshold():
+    """Verifies completely irrelevant queries return a clean empty list."""
+    payload = {
+        "query": "What is the recipe for baking chocolate chip cookies?",
+        "phase": "Bronze"
+    }
+    response = client.post("/api/v1/search", json=payload)
+    assert response.status_code == 200
     
-    # 4. Filter by strict 0.45 Threshold Gate
-    recommendations = []
-    for sub_idx, score in enumerate(cos_scores):
-        score_val = float(score)
-        if score_val >= 0.45:
-            # Map back to real database index location
-            real_db_idx = matched_indices[sub_idx]
-            original_faq = faq_database[real_db_idx]
-            
-            recommendations.append({
-                "faq_id": real_db_idx,
-                "question": original_faq["question"],
-                "answer": original_faq["answer"],
-                "similarity_score": score_val
-            })
-            
-    return {"recommendations": recommendations}
+    data = response.json()
+    # Unpack the recommendations wrapper
+    assert "recommendations" in data
+    results = data["recommendations"]
+    
+    assert len(results) == 0, "Gate failed: Irrelevant query leaked through threshold!"
