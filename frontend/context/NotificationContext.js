@@ -202,30 +202,53 @@ export function NotificationProvider({ children }) {
   };
 
   const checkPushSubscription = async () => {
-    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    console.log('[Push Debug] checkPushSubscription initiated.');
+    if (!('serviceWorker' in navigator)) {
+      console.warn('[Push Debug] serviceWorker not in navigator');
+      return;
+    }
+    if (!('PushManager' in window)) {
+      console.warn('[Push Debug] PushManager not in window');
+      return;
+    }
     
     try {
+      console.log('[Push Debug] Waiting for service worker registration to be ready...');
       const registration = await navigator.serviceWorker.ready;
+      console.log('[Push Debug] SW registration ready. Scope:', registration.scope);
+      
       let subscription = await registration.pushManager.getSubscription();
+      console.log('[Push Debug] Current subscription state:', subscription);
 
+      console.log('[Push Debug] Fetching server VAPID public key...');
       const publicKeyResponse = await api.get('/notifications/push/vapid-public-key');
+      console.log('[Push Debug] Server VAPID key response:', publicKeyResponse);
       if (!publicKeyResponse || !publicKeyResponse.publicKey) {
+        console.warn('[Push Debug] No server VAPID key returned.');
         setIsPushEnabled(!!subscription);
         return;
       }
 
       const serverVapidKey = publicKeyResponse.publicKey;
       const registeredVapidKey = localStorage.getItem('registered_vapid_key');
+      console.log('[Push Debug] serverVapidKey:', serverVapidKey);
+      console.log('[Push Debug] registeredVapidKey:', registeredVapidKey);
 
       // If subscription exists but VAPID key changed (e.g. server restarted), unsubscribe & force resubscribe
       if (subscription && registeredVapidKey !== serverVapidKey) {
-        console.log('[Push] Server VAPID key mismatch. Re-subscribing...');
+        console.log('[Push Debug] Server VAPID key mismatch. Re-subscribing...');
         try {
           await subscription.unsubscribe();
-        } catch (_) {}
+          console.log('[Push Debug] Successfully unsubscribed old subscription.');
+        } catch (unsubErr) {
+          console.warn('[Push Debug] Error unsubscribing:', unsubErr.message);
+        }
         try {
           await api.delete('/notifications/push/unsubscribe');
-        } catch (_) {}
+          console.log('[Push Debug] Deleted subscription from backend.');
+        } catch (apiDelErr) {
+          console.warn('[Push Debug] Backend delete unsubscribe failed:', apiDelErr.message);
+        }
         localStorage.removeItem('registered_vapid_key');
         subscription = null;
       }
@@ -234,29 +257,36 @@ export function NotificationProvider({ children }) {
 
       // Always sync subscription with the backend when logged in to prevent out-of-sync accounts
       if (subscription) {
+        console.log('[Push Debug] Syncing existing subscription with backend...');
         try {
           await api.post('/notifications/push/subscribe', { subscription });
           localStorage.setItem('registered_vapid_key', serverVapidKey);
           setIsPushEnabled(true);
+          console.log('[Push Debug] Sync complete. VAPID key saved locally.');
         } catch (syncErr) {
-          console.error('Failed to sync push subscription with backend:', syncErr.message);
+          console.error('[Push Debug] Failed to sync push subscription with backend:', syncErr.message);
         }
       } else if (Notification.permission === 'granted') {
+        console.log('[Push Debug] No subscription found, but notification permission is granted. Subscribing...');
         try {
           const newSubscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
             applicationServerKey: urlBase64ToUint8Array(serverVapidKey),
           });
+          console.log('[Push Debug] Created new subscription:', newSubscription);
 
           await api.post('/notifications/push/subscribe', { subscription: newSubscription });
           localStorage.setItem('registered_vapid_key', serverVapidKey);
           setIsPushEnabled(true);
+          console.log('[Push Debug] Successfully saved new subscription to backend.');
         } catch (subErr) {
-          console.error('Failed to auto-subscribe web browser push:', subErr);
+          console.error('[Push Debug] Failed to auto-subscribe web browser push:', subErr);
         }
+      } else {
+        console.log('[Push Debug] No subscription found and permission is not granted. Current permission:', Notification.permission);
       }
     } catch (err) {
-      console.error('Error in checkPushSubscription:', err);
+      console.error('[Push Debug] Error in checkPushSubscription:', err);
     }
   };
 
