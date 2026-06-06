@@ -79,6 +79,13 @@ function AuthPageContent() {
     setError('');
     setLoading(true);
     try {
+      const isCapacitor = typeof window !== 'undefined' && window.Capacitor;
+      if (isCapacitor) {
+        console.log('[Google Auth] Capacitor detected. Using redirect flow...');
+        await signInWithRedirect(auth, googleProvider);
+        return; // Redirect navigates the WebView, no need to proceed
+      }
+
       // Try popup first (most reliable on all web platforms, including Safari and PWA, when triggered from user click)
       const result = await signInWithPopup(auth, googleProvider);
       const idToken = await result.user.getIdToken();

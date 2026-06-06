@@ -86,7 +86,7 @@ if (hasVapidKeys) {
 const sendPushNotification = async (userId, payload) => {
   try {
     const user = await User.findById(userId);
-    if (!user || !user.preferences || !user.preferences.pushNotifications) {
+    if (!user || (user.preferences && user.preferences.pushNotifications === false)) {
       return { sent: false, reason: 'disabled_by_preferences' };
     }
 
@@ -181,7 +181,7 @@ const broadcastPushNotification = async (payload) => {
         { 'fcmTokens.0': { $exists: true } }
       ],
       isBanned: false,
-      'preferences.pushNotifications': true
+      'preferences.pushNotifications': { $ne: false }
     });
 
     for (const user of users) {

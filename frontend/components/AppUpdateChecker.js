@@ -56,16 +56,12 @@ export default function AppUpdateChecker() {
       const isNewer = data.latestVersionCode > installedVersionCode || 
                       (data.latestVersion !== installedVersionName && installedVersionCode === 1);
 
-      if (isNewer) {
+      if (isNewer && isManual) {
         setUpdateInfo(data);
         setShowModal(true);
-        if (isManual) {
-          toast.success(`New version v${data.latestVersion} is available!`);
-        }
-      } else {
-        if (isManual) {
-          toast.success('Your app is already up to date!');
-        }
+        toast.success(`New version v${data.latestVersion} is available!`);
+      } else if (!isNewer && isManual) {
+        toast.success('Your app is already up to date!');
       }
     } catch (err) {
       console.error('[Update Checker] Failed to check for updates:', err);
@@ -77,9 +73,6 @@ export default function AppUpdateChecker() {
 
 
   useEffect(() => {
-    // Initial startup check
-    const timer = setTimeout(checkUpdates, 3000);
-
     // Request push notification permissions on Capacitor startup
     if (typeof window !== 'undefined' && window.Capacitor) {
       const initPush = async () => {
@@ -98,8 +91,6 @@ export default function AppUpdateChecker() {
       };
       initPush();
     }
-
-    return () => clearTimeout(timer);
   }, []);
 
   useEffect(() => {
@@ -121,45 +112,9 @@ export default function AppUpdateChecker() {
   useEffect(() => {
     if (!socket) return;
 
-    // Listen to real-time app update push events from admin panel
+    // Listen to real-time app update push events from admin panel quietly (no modals/interrupts)
     socket.on('app:update', (data) => {
-      console.log('[Update Checker] Real-time app update received:', data);
-      
-      const triggerRealtimeCheck = async () => {
-        try {
-          let installedVersionName = '1.0.0';
-          let installedVersionCode = 1;
-
-          if (typeof window !== 'undefined' && window.Capacitor) {
-            const { App } = require('@capacitor/app');
-            const info = await App.getInfo();
-            installedVersionName = info.version || '1.0.0';
-            installedVersionCode = parseInt(info.build, 10) || 1;
-          } else if (typeof window !== 'undefined' && window.__TAURI__) {
-            try {
-              const { getVersion } = require('@tauri-apps/api/app');
-              installedVersionName = await getVersion();
-            } catch (_) {}
-          } else {
-            // Web clients can display an alert of updates and trigger page refresh
-            alert(`A new app version (v${data.latestVersion}) is available! The page will now reload.`);
-            window.location.reload();
-            return;
-          }
-
-          const isNewer = data.latestVersionCode > installedVersionCode || 
-                          (data.latestVersion !== installedVersionName && installedVersionCode === 1);
-
-          if (isNewer) {
-            setUpdateInfo(data);
-            setShowModal(true);
-          }
-        } catch (err) {
-          console.error('[Update Checker] Real-time comparison failed:', err);
-        }
-      };
-
-      triggerRealtimeCheck();
+      console.log('[Update Checker] Real-time app update notice received:', data);
     });
 
     return () => {

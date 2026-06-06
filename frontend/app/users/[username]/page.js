@@ -42,12 +42,12 @@ export default function UserProfilePage() {
 
   useEffect(() => {
     if (tab === 'questions') {
-      api.get(`/users/${username}/questions`).then(d => setQuestions(d.questions || [])).catch(() => {});
+      api.get(`/users/${username}/questions`).then(d => setQuestions(d?.questions || [])).catch(() => {});
     } else if (tab === 'answers') {
-      api.get(`/users/${username}/answers`).then(d => setAnswers(d.answers || [])).catch(() => {});
+      api.get(`/users/${username}/answers`).then(d => setAnswers(d?.answers || [])).catch(() => {});
     } else if (tab === 'saved' && isOwnProfile) {
-      api.get('/users/me/saved').then(d => setSavedQuestions(d.saved || [])).catch(() => {});
-      api.get('/users/me/saved/faqs').then(d => setSavedFaqs(d.saved || [])).catch(() => {});
+      api.get('/users/me/saved').then(d => setSavedQuestions(d?.saved || [])).catch(() => {});
+      api.get('/users/me/saved/faqs').then(d => setSavedFaqs(d?.saved || [])).catch(() => {});
     }
   }, [username, tab, isOwnProfile]);
 

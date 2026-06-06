@@ -619,7 +619,15 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 6, 2026)
 
-1. **Foreground Mobile & PWA Notification Banner Fix**
+1. **Default-Enabled Push Notifications for All Users**
+   * *Resolution*: Updated `backend/services/pushService.js` to change the user preferences check. Instead of ignoring users with unpopulated or missing `preferences` objects (which excluded migrated or newly registered users), the push notification engine now defaults to sending alerts to all users, only excluding them if `preferences.pushNotifications` is explicitly set to `false`.
+2. **Capacitor WebView Google Sign-in Popup Bypass**
+   * *Resolution*: Updated `frontend/app/auth/page.js` to detect `window.Capacitor`. If running inside the Capacitor WebView, it directly uses `signInWithRedirect` instead of trying `signInWithPopup` first. This prevents the WebView from spawning an external Chrome browser window for authentication and ensures the redirect cycle handles callbacks seamlessly within the app.
+3. **TypeError Safety for User Profile Tab Navigation**
+   * *Resolution*: Updated `UserProfilePage` in `frontend/app/users/[username]/page.js` to use optional chaining (`d?.questions`, `d?.answers`, `d?.saved`) on the profile data fetched during tab changes. This protects PWA and iOS/Android WebView wrapper apps from crashing (white blank screen) when clicking between tabs if a response contains missing or corrupt fields.
+4. **App Update Automatic Popup Removal**
+   * *Resolution*: Refactored `AppUpdateChecker.js` to completely disable automatic startup checks and socket-driven reload/alert notifications. The app update checker will now only check and show update options when manually clicked on the user profile or settings pages, resolving user frustration with modal interruption.
+5. **Foreground Mobile & PWA Notification Banner Fix**
    * *Resolution*: Updated the `showBrowserNotification` method inside `NotificationContext.js` to dispatch notifications via `reg.showNotification(...)` using the active service worker registry. This replaces deprecated `new Notification(...)` calls which are ignored/blocked by mobile WebViews, PWA containers, and iOS/Android browsers when the app is in the foreground.
 2. **Dynamic VAPID Sync & Key Mismatch Resolution**
    * *Resolution*: Configured `NotificationContext.js` to store the active subscription key in `localStorage` (`registered_vapid_key`) and compare it on login. When a VAPID key mismatch is detected (e.g. following a backend restart with dynamic key generation), the client automatically unsubscribes the obsolete subscription and registers a fresh one, curing silent web push failures.
