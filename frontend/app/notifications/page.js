@@ -180,6 +180,46 @@ export default function NotificationsPage() {
           ))}
         </div>
       )}
+
+      {/* OS Troubleshooting & Diagnostics */}
+      <div className="mt-8 p-6 rounded-xl border border-[var(--color-border)] bg-[var(--color-bg-tertiary)]/20 animate-in fade-in duration-500">
+        <h3 className="font-semibold text-sm text-[var(--color-text)] flex items-center gap-2">
+          <span>⚙️</span> OS Notification Troubleshooting
+        </h3>
+        <p className="text-xs text-[var(--color-text-secondary)] mt-2 leading-relaxed">
+          If you are not receiving system tray notifications on your device, please verify your operating system settings:
+        </p>
+        <ul className="list-disc list-inside text-xs text-[var(--color-text-secondary)] mt-3 space-y-2 pl-2">
+          <li>
+            <strong>Disable Focus Assist / Do Not Disturb:</strong> In Windows, ensure the <em>Do Not Disturb</em> / <em>Focus Assist</em> mode (the sleeping bell icon in the bottom-right taskbar calendar/notification panel) is turned <strong>OFF</strong>. When active, Windows silences all banner alerts.
+          </li>
+          <li>
+            <strong>Allow Browser in Windows Settings:</strong> Go to <strong>Windows Settings &gt; System &gt; Notifications</strong>. Scroll down to &quot;Get notifications from these senders&quot; and ensure your browser (e.g., <strong>Google Chrome</strong> or <strong>Microsoft Edge</strong>) is toggled to <strong>ON</strong>.
+          </li>
+          <li>
+            <strong>Verify Browser Site Settings:</strong> Click the lock/settings icon in the browser address bar next to the website URL and verify that <strong>Notifications</strong> is set to <strong>Allow</strong>.
+          </li>
+        </ul>
+        <div className="mt-4 pt-4 border-t border-[var(--color-border)] flex items-center gap-3">
+          <button
+            onClick={() => {
+              if (showBrowserNotification) {
+                showBrowserNotification({
+                  title: 'Test Notification Works! 🎉',
+                  message: 'If you see this, your browser and OS notification settings are configured correctly.'
+                });
+                toast.success('Test notification triggered!');
+              } else {
+                toast.error('Notification system not initialized yet');
+              }
+            }}
+            className="px-4 py-2 bg-[var(--color-bg-tertiary)] hover:bg-[var(--color-bg-tertiary)]/80 border border-[var(--color-border)] text-[var(--color-text)] text-xs font-semibold rounded-lg transition-colors"
+          >
+            Test OS Notification
+          </button>
+        </div>
+      </div>
+
     </div>
   );
 }
