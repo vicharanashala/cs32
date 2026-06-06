@@ -204,14 +204,28 @@ export default function NotificationsPage() {
         <div className="mt-4 pt-4 border-t border-[var(--color-border)] flex items-center gap-3">
           <button
             onClick={() => {
+              console.log('[Page Debug] Test button clicked.');
+              console.log('[Page Debug] type of showBrowserNotification:', typeof showBrowserNotification);
+              console.log('[Page Debug] Notification API check:', (typeof window !== 'undefined' && 'Notification' in window) ? 'supported' : 'not supported');
+              if (typeof window !== 'undefined' && 'Notification' in window) {
+                console.log('[Page Debug] Notification.permission:', window.Notification.permission);
+              }
+              
               if (showBrowserNotification) {
-                showBrowserNotification({
-                  title: 'Test Notification Works! 🎉',
-                  message: 'If you see this, your browser and OS notification settings are configured correctly.'
-                });
-                toast.success('Test notification triggered!');
+                try {
+                  showBrowserNotification({
+                    title: 'Test Notification Works! 🎉',
+                    message: 'If you see this, your browser and OS notification settings are configured correctly.'
+                  });
+                  toast.success('Test notification triggered!');
+                  console.log('[Page Debug] showBrowserNotification call complete.');
+                } catch (clickErr) {
+                  console.error('[Page Debug] Caught error invoking showBrowserNotification:', clickErr);
+                  toast.error(`Error: ${clickErr.message}`);
+                }
               } else {
                 toast.error('Notification system not initialized yet');
+                console.warn('[Page Debug] showBrowserNotification is undefined or null');
               }
             }}
             className="px-4 py-2 bg-[var(--color-bg-tertiary)] hover:bg-[var(--color-bg-tertiary)]/80 border border-[var(--color-border)] text-[var(--color-text)] text-xs font-semibold rounded-lg transition-colors"
