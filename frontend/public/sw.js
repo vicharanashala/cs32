@@ -62,27 +62,27 @@ const STATIC_ASSETS = [
   "/_next/static/chunks/324-26954518a83876c7.js",
   "/_next/static/chunks/689-dae23ab7fcb269ae.js",
   "/_next/static/chunks/180-ae226dde440fde50.js",
-  "/_next/static/chunks/750-e417bb70c74aff63.js",
+  "/_next/static/chunks/750-d05853c846d3693a.js",
   "/_next/static/chunks/app/layout-ecf9506a39dfcbe6.js",
-  "/_next/static/chunks/17-415c15461d1f32b5.js",
+  "/_next/static/chunks/app/downloads/page-02728a1e91a865e1.js",
+  "/_next/static/chunks/17-d0bf48d9ef10df88.js",
   "/_next/static/chunks/668-5335dfa152ed9336.js",
   "/_next/static/chunks/app/faqs/[slug]/page-33b5d19e83c703a7.js",
   "/_next/static/chunks/2bfc466f-47019a40064a549f.js",
   "/_next/static/chunks/147-f45f1800405fce62.js",
   "/_next/static/chunks/app/auth/page-45252ac1840cdf08.js",
-  "/_next/static/chunks/app/faqs/page-55b928c3c6c09e97.js",
   "/_next/static/chunks/app/admin/page-6e511ab1c67ec40a.js",
+  "/_next/static/chunks/app/faqs/page-55b928c3c6c09e97.js",
   "/_next/static/chunks/app/guidelines/page-6ce6118f1a2d3170.js",
-  "/_next/static/chunks/app/downloads/page-02728a1e91a865e1.js",
   "/_next/static/chunks/app/notifications/page-9ecf69722ff34ce9.js",
-  "/_next/static/chunks/app/questions/ask/page-5fe4257ef8559020.js",
   "/_next/static/chunks/413-b1f6270b2b1a22f6.js",
   "/_next/static/chunks/app/questions/page-799ad849fbb9827f.js",
   "/_next/static/chunks/app/questions/[id]/page-a5e28e0e64b6b4e9.js",
-  "/_next/static/chunks/app/page-8081f9d2a9eb13cc.js",
+  "/_next/static/chunks/app/questions/ask/page-5fe4257ef8559020.js",
+  "/_next/static/chunks/app/search/page-8f2fe109a3ed8215.js",
   "/_next/static/chunks/app/saved/page-2f705b1a08dc82e8.js",
   "/_next/static/chunks/app/tags/page-68f59bc9f4ace876.js",
-  "/_next/static/chunks/app/search/page-11af031a54079628.js",
+  "/_next/static/chunks/app/page-8081f9d2a9eb13cc.js",
   "/_next/static/chunks/app/tags/[name]/page-7dd4ba9af9fe402f.js",
   "/_next/static/chunks/app/users/[username]/page-206e66b1e7b6042c.js",
   "/_next/static/chunks/app/users/page-68973db900ad0adf.js",
@@ -226,8 +226,8 @@ self.addEventListener('push', (event) => {
     const title = data.title || 'PrashnaSārathi';
     const options = {
       body: data.body || '',
-      icon: data.icon || '/icon.png',
-      badge: data.badge || '/badge.png',
+      icon: data.icon || '/logo.png',
+      badge: data.badge || '/pwa/icons/icon-72x72.png',
       tag: data.tag || 'notification',
       data: data.data || {},
       requireInteraction: false,
@@ -235,7 +235,20 @@ self.addEventListener('push', (event) => {
     };
 
     event.waitUntil(
-      self.registration.showNotification(title, options)
+      Promise.all([
+        // Show the OS banner
+        self.registration.showNotification(title, options),
+        // Notify all open page clients so they can show an in-app toast instantly
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+          windowClients.forEach((client) => {
+            client.postMessage({
+              type: 'PUSH_RECEIVED',
+              title: title,
+              message: options.body,
+            });
+          });
+        }),
+      ])
     );
   } catch (err) {
     console.error('[Service Worker] Error displaying push notification:', err);

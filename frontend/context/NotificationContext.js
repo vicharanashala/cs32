@@ -53,6 +53,9 @@ export function NotificationProvider({ children }) {
     }
   }, []);
 
+  // Track last seen unread count for detecting new notifications via polling
+  const lastUnreadCountRef = useRef(0);
+
   useEffect(() => {
     if (!user) {
       setUnreadCount(0);
@@ -60,6 +63,7 @@ export function NotificationProvider({ children }) {
       setUnreadAdminAlerts([]);
       setIsPushEnabled(false);
       lastCheckedUserRef.current = null;
+      lastUnreadCountRef.current = 0;
       return;
     }
 
@@ -89,63 +93,97 @@ export function NotificationProvider({ children }) {
       }
     }
 
-    if (!socket) return;
-
+    // ── Socket.IO handlers (works in local dev / non-Vercel hosting) ──
     const handleNotification = (data) => {
-      // Fetch latest notifications to keep the state perfectly synced with real DB IDs
       fetchNotificationsList();
-      
       toast((t) => (
         <div className="flex flex-col gap-1">
           <p className="font-bold text-sm text-[var(--color-text)]">{data.title || 'New Notification'}</p>
           <p className="text-xs text-[var(--color-text-secondary)]">{data.message || data.body || ''}</p>
         </div>
-      ), {
-        icon: '🔔',
-        duration: 4000,
-        position: 'top-right'
-      });
-
+      ), { icon: '🔔', duration: 4000, position: 'top-right' });
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
         showBrowserNotification(data);
       }
     };
 
     const handleAdminAlert = (data) => {
-      // Ignore alert if it was sent by this user
-      if (user && (user._id === data.senderId || user.id === data.senderId)) {
-        return;
-      }
-
-      // Immediately trigger a refetch so the new system broadcast is synced down
+      if (user && (user._id === data.senderId || user.id === data.senderId)) return;
       fetchNotificationsList();
-      
       toast((t) => (
         <div className="flex flex-col gap-1">
           <p className="font-bold text-sm text-[var(--color-text)]">{data.title || 'System Alert'}</p>
           <p className="text-xs text-[var(--color-text-secondary)]">{data.message || ''}</p>
         </div>
-      ), {
-        icon: '⚠️',
-        duration: 5000,
-        position: 'top-right'
-      });
-
-      // Also trigger browser notification
+      ), { icon: '⚠️', duration: 5000, position: 'top-right' });
       if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
-        showBrowserNotification({
-          title: data.title || 'System Alert',
-          message: data.message
-        });
+        showBrowserNotification({ title: data.title || 'System Alert', message: data.message });
       }
     };
 
-    socket.on('notification:new', handleNotification);
-    socket.on('admin:alert', handleAdminAlert);
+    if (socket) {
+      socket.on('notification:new', handleNotification);
+      socket.on('admin:alert', handleAdminAlert);
+    }
+
+    // ── Polling fallback (Vercel serverless / when socket unavailable) ──
+    // Poll every 8 seconds. When unread count increases, show in-app toast.
+    const socketConnected = socket && socket.connected;
+    let pollInterval = null;
+    if (!socketConnected) {
+      pollInterval = setInterval(async () => {
+        try {
+          const data = await api.get('/notifications');
+          const newUnread = data.unreadCount || 0;
+          const list = data.notifications || [];
+          setNotifications(list);
+          setUnreadCount(newUnread);
+          const alerts = list.filter(n => n.type === 'system' && n.title === 'Admin Alert' && !n.isRead);
+          setUnreadAdminAlerts(alerts);
+
+          // If unread count increased since last poll → show toast for newest item
+          if (newUnread > lastUnreadCountRef.current && list.length > 0) {
+            const newest = list[0];
+            toast((t) => (
+              <div className="flex flex-col gap-1">
+                <p className="font-bold text-sm text-[var(--color-text)]">{newest.title || 'New Notification'}</p>
+                <p className="text-xs text-[var(--color-text-secondary)]">{newest.message || ''}</p>
+              </div>
+            ), { icon: '🔔', duration: 4000, position: 'top-right' });
+          }
+          lastUnreadCountRef.current = newUnread;
+        } catch (_) {/* silent — user may be offline */}
+      }, 8000);
+    }
+
+    // ── Service Worker → Page message bridge ──
+    // When a Web Push arrives and the page is open, the SW sends a postMessage.
+    // This lets us show the in-app toast even on Vercel (no socket needed).
+    const handleSWMessage = (event) => {
+      if (event.data && event.data.type === 'PUSH_RECEIVED') {
+        fetchNotificationsList();
+        const { title, message } = event.data;
+        toast((t) => (
+          <div className="flex flex-col gap-1">
+            <p className="font-bold text-sm text-[var(--color-text)]">{title || 'New Notification'}</p>
+            <p className="text-xs text-[var(--color-text-secondary)]">{message || ''}</p>
+          </div>
+        ), { icon: '🔔', duration: 4000, position: 'top-right' });
+      }
+    };
+    if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleSWMessage);
+    }
 
     return () => {
-      socket.off('notification:new', handleNotification);
-      socket.off('admin:alert', handleAdminAlert);
+      if (socket) {
+        socket.off('notification:new', handleNotification);
+        socket.off('admin:alert', handleAdminAlert);
+      }
+      if (pollInterval) clearInterval(pollInterval);
+      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+      }
     };
   }, [user, socket, browserPermission, fetchNotificationsList, isDesktop]);
 
