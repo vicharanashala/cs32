@@ -318,6 +318,28 @@ Medium-Impact Quality of Life
 
 ### Recent Fixes
 
+#### Latest Fixes (June 6, 2026)
+
+1. **Dynamic Platform-Agnostic Push Notifications & API Routing**
+   * *Problem*: In Tauri desktop, Electron, and Capacitor mobile wrappers, standard relative paths (e.g. `/api/...` or socket connection paths `''`) resolved to the local wrapper domain (e.g. `tauri://localhost` or `capacitor://localhost`), breaking WebSocket connections, API requests, and real-time push notifications.
+   * *Resolution*:
+     * Refactored `frontend/lib/api.js` to dynamically route requests to the absolute production URL `https://prashnasarathi.vercel.app/api` if a local wrapper protocol (`tauri://`, `file:`, `capacitor://`) is detected.
+     * Refactored `frontend/context/SocketContext.js` to dynamically connect the Socket client directly to `https://prashnasarathi.vercel.app` on those same wrapper protocols, ensuring that real-time push notifications over WebSockets are delivered instantly across all platforms (web, desktop, and mobile).
+     * Synchronized Capacitor configurations and built/validated client bundle compatibility.
+
+2. **Windows Desktop Installer Unicode Path Stabilization**
+   * *Problem*: Windows systems with non-UTF-8 local character encoding failed to install or launch the desktop application due to a unicode character (`ā`) in the folder installation paths and display names.
+   * *Resolution*:
+     * Replaced the installation directory path in `Installer.cs` with the ASCII-safe `PrashnaSarathi` path.
+     * Escaped all user-facing unicode strings using C# Unicode escape sequences (`\u0101` for `ā`) to maintain perfect branding while preventing path corruption.
+     * Rebuilt the Windows installer (`prashnasarathi-win.exe`) successfully.
+
+3. **Responsive Mobile Dropdown Overlays**
+   * *Problem*: When device orientation changed to landscape, the vertical layout list of dropdown links inside the Navbar overflowed the fixed-height sticky header and overlapped clumsily with background content.
+   * *Resolution*:
+     * Redesigned the mobile dropdown inside `Navbar.js` to render as a solid, absolute-positioned container with full-width overlays and high z-index.
+     * Added custom responsive max-height scrolling boundaries (`max-h-[calc(100vh-3rem)] overflow-y-auto`) so that landscape viewport heights remain fully functional and scrollable.
+
 #### Latest Fixes (June 5, 2026)
 
 1. **Mandatory Rules & Regulations Acceptance Flow**

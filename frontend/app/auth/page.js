@@ -1,10 +1,10 @@
 'use client';
-import { Suspense, useState } from 'react';
+import { Suspense, useState, useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/context/AuthContext';
 import toast from 'react-hot-toast';
-import { auth, googleProvider, signInWithPopup, GoogleAuthProvider, isFirebaseConfigured } from '@/lib/firebase';
+import { auth, googleProvider, signInWithPopup, signInWithRedirect, getRedirectResult, GoogleAuthProvider, isFirebaseConfigured } from '@/lib/firebase';
 
 function AuthPageContent() {
   const searchParams = useSearchParams();
@@ -14,6 +14,43 @@ function AuthPageContent() {
   const [form, setForm] = useState({ username: '', email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Handle redirect login result on mount
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+
+    let isMounted = true;
+    const checkRedirect = async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (result && isMounted) {
+          setLoading(true);
+          const idToken = await result.user.getIdToken();
+          if (!idToken) {
+            throw new Error('Could not retrieve Google ID token.');
+          }
+          await loginWithGoogle(idToken);
+          router.push('/');
+        }
+      } catch (err) {
+        console.error("Google Sign-In Redirect Error:", err);
+        if (isMounted) {
+          setError(err.message || 'Google Sign-in failed');
+          toast.error(err.message || 'Google Sign-in failed');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    checkRedirect();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [isFirebaseConfigured, loginWithGoogle, router]);
 
   if (user) {
     router.push('/');
@@ -40,6 +77,17 @@ function AuthPageContent() {
     setError('');
     setLoading(true);
     try {
+      // Check if running on mobile device or inside a hybrid app (webview/Capacitor)
+      const isMobileOrWebView = typeof window !== 'undefined' && (
+        window.Capacitor ||
+        /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(window.navigator.userAgent)
+      );
+
+      if (isMobileOrWebView) {
+        await signInWithRedirect(auth, googleProvider);
+        return;
+      }
+
       const result = await signInWithPopup(auth, googleProvider);
       const idToken = await result.user.getIdToken();
       if (!idToken) {

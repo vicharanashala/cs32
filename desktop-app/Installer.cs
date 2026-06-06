@@ -26,7 +26,7 @@ namespace PrashnaSarathiInstaller
 
         public InstallerForm()
         {
-            this.Text = "PrashnaSārathi Setup";
+            this.Text = "PrashnaS\u0101rathi Setup";
             this.Size = new Size(400, 220);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.StartPosition = FormStartPosition.CenterScreen;
@@ -36,7 +36,7 @@ namespace PrashnaSarathiInstaller
             
             // Header Title
             Label titleLabel = new Label();
-            titleLabel.Text = "Install PrashnaSārathi";
+            titleLabel.Text = "Install PrashnaS\u0101rathi";
             titleLabel.Font = new Font("Segoe UI", 14, FontStyle.Bold);
             titleLabel.ForeColor = Color.White;
             titleLabel.Location = new Point(20, 20);
@@ -45,7 +45,7 @@ namespace PrashnaSarathiInstaller
 
             // Description Label
             Label descLabel = new Label();
-            descLabel.Text = "This will install PrashnaSārathi to your computer and create shortcuts.";
+            descLabel.Text = "This will install PrashnaS\u0101rathi to your computer and create shortcuts.";
             descLabel.Font = new Font("Segoe UI", 9);
             descLabel.ForeColor = Color.FromArgb(160, 166, 178);
             descLabel.Location = new Point(20, 55);
@@ -95,7 +95,7 @@ namespace PrashnaSarathiInstaller
             worker.WorkerReportsProgress = true;
             worker.DoWork += (s, ev) => {
                 string appData = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
-                string destDir = Path.Combine(appData, "PrashnaSārathi");
+                string destDir = Path.Combine(appData, "PrashnaSarathi");
 
                 if (Directory.Exists(destDir))
                 {
@@ -138,7 +138,7 @@ namespace PrashnaSarathiInstaller
                 }
 
                 worker.ReportProgress(85, "Creating shortcuts...");
-                CreateShortcut("PrashnaSārathi", Path.Combine(destDir, "PrashnaSarathi.exe"), destDir);
+                CreateShortcut("PrashnaS\u0101rathi", Path.Combine(destDir, "PrashnaSarathi.exe"), destDir);
 
                 worker.ReportProgress(100, "Done");
             };
@@ -157,7 +157,7 @@ namespace PrashnaSarathiInstaller
                 }
                 else
                 {
-                    MessageBox.Show("PrashnaSārathi has been successfully installed!\n\nYou can launch it from your Desktop or the Start Menu.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    MessageBox.Show("PrashnaS\u0101rathi has been successfully installed!\n\nYou can launch it from your Desktop or the Start Menu.", "Success", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 }
                 this.Close();
             };

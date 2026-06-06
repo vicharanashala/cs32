@@ -5,9 +5,20 @@ import { useAuth } from './AuthContext';
 
 const SocketContext = createContext(null);
 
-const SOCKET_URL = typeof window !== 'undefined'
-  ? ''
-  : (process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000');
+const getSocketUrl = () => {
+  if (typeof window === 'undefined') {
+    return process.env.NEXT_PUBLIC_SOCKET_URL || 'http://localhost:5000';
+  }
+
+  const origin = window.location.origin;
+  if (origin.startsWith('tauri://') || origin.startsWith('file:') || origin.startsWith('capacitor://')) {
+    return 'https://prashnasarathi.vercel.app';
+  }
+
+  return '';
+};
+
+const SOCKET_URL = getSocketUrl();
 
 export function SocketProvider({ children }) {
   const { user } = useAuth();

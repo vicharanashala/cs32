@@ -299,7 +299,7 @@ export default function Navbar({ onSearch }) {
           </div>
 
           {menuOpen && (
-            <div className="md:hidden pb-4 border-t border-[var(--color-border)] pt-4">
+            <div className="md:hidden absolute top-12 left-0 right-0 bg-[var(--color-bg-secondary)] border-b border-[var(--color-border)] pb-4 pt-2 px-4 shadow-lg z-50 max-h-[calc(100vh-3rem)] overflow-y-auto">
               <form onSubmit={handleSearch} className="mb-4">
                 <div className="relative" style={{ height: '40px' }}>
                   <input
