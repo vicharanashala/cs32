@@ -2,7 +2,11 @@ const User = require('../models/User');
 const config = require('../config');
 
 exports.getVapidPublicKey = (req, res) => {
-  res.json({ publicKey: config.webPush.publicKey });
+  const publicKey = config.webPush && config.webPush.publicKey;
+  if (!publicKey) {
+    return res.status(503).json({ error: 'Push notifications not configured on server', publicKey: null });
+  }
+  res.json({ publicKey });
 };
 
 exports.savePushSubscription = async (req, res, next) => {

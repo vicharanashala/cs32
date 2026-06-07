@@ -76,6 +76,7 @@ export function NotificationProvider({ children }) {
       if (typeof window !== 'undefined' && window.Capacitor) {
         registerCapacitorPush();
       } else if (isDesktop) {
+        // Desktop (Tauri/Electron): just request OS permission, no Web Push subscription needed
         if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
           Notification.requestPermission().then(permission => {
             setBrowserPermission(permission);
@@ -83,13 +84,14 @@ export function NotificationProvider({ children }) {
               toast.success('Real-time notifications enabled');
             }
           });
+        } else if (typeof window !== 'undefined' && 'Notification' in window) {
+          setBrowserPermission(Notification.permission);
         }
       } else {
-        checkPushSubscription().then(() => {
-          if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-            requestBrowserPermission();
-          }
-        });
+        // Web browser: check subscription status; if permission already granted, auto-subscribe
+        // Do NOT call requestBrowserPermission here (would double-prompt). checkPushSubscription
+        // handles auto-resubscription when permission === 'granted' internally.
+        checkPushSubscription();
       }
     }
 
@@ -141,7 +143,7 @@ export function NotificationProvider({ children }) {
           const alerts = list.filter(n => n.type === 'system' && n.title === 'Admin Alert' && !n.isRead);
           setUnreadAdminAlerts(alerts);
 
-          // If unread count increased since last poll → show toast for newest item
+          // If unread count increased since last poll → show toast + device notification for newest item
           if (newUnread > lastUnreadCountRef.current && list.length > 0) {
             const newest = list[0];
             toast((t) => (
@@ -150,6 +152,10 @@ export function NotificationProvider({ children }) {
                 <p className="text-xs text-[var(--color-text-secondary)]">{newest.message || ''}</p>
               </div>
             ), { icon: '🔔', duration: 4000, position: 'top-right' });
+            // Also fire device-level notification banner
+            if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+              showBrowserNotification(newest);
+            }
           }
           lastUnreadCountRef.current = newUnread;
         } catch (_) {/* silent — user may be offline */}
