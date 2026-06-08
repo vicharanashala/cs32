@@ -69,40 +69,34 @@ export default function PrashnaSarathiWidget() {
       const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
       const pageTitle = typeof document !== 'undefined' ? document.title : '';
 
-      const data = await api.get('/search/ai', {
-        q: text,
-        currentUrl,
-        pageTitle
+      // Use native fetch so non-2xx responses don't throw — they return graceful JSON
+      const params = new URLSearchParams({ q: text, currentUrl, pageTitle });
+      const res = await fetch(`/api/search/ai?${params.toString()}`, {
+        headers: { 'Content-Type': 'application/json' }
       });
+      const data = await res.json();
 
       if (data.status === 'blocked') {
         setMessages(prev => [...prev, {
           sender: 'bot',
           text: `⚠️ ${data.message || 'Blocked due to safety guidelines.'}`,
-          status: 'blocked',
-          reason: data.reason
-        }]);
-      } else if (data.status === 'Not Found') {
-        setMessages(prev => [...prev, {
-          sender: 'bot',
-          text: data.message || 'No matching information was found in the available knowledge sources.',
-          status: 'Not Found',
-          relatedTopics: data.relatedTopics || []
+          status: 'blocked'
         }]);
       } else {
+        const displayText = data.answer || data.message || 'No matching information was found in the available knowledge sources.';
         setMessages(prev => [...prev, {
           sender: 'bot',
-          text: data.answer,
+          text: displayText,
           status: data.status,
           source: data.source,
           relatedTopics: data.relatedTopics || []
         }]);
       }
     } catch (err) {
-      console.error(err);
+      console.error('Widget AI error:', err);
       setMessages(prev => [...prev, {
         sender: 'bot',
-        text: 'Sorry, I encountered an error. Please try again.',
+        text: 'Could not reach the AI assistant. Please check your connection.',
         status: 'Error'
       }]);
     } finally {

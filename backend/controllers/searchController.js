@@ -233,25 +233,38 @@ Generate the response matching the specified guidelines. Do not output anything 
       });
     }
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`;
+    const modelName = 'gemini-2.5-flash';
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
     const payload = {
       contents: [{
         parts: [{ text: userPrompt }]
-      }]
+      }],
+      generationConfig: {
+        temperature: 0.2,
+        maxOutputTokens: 1024,
+      }
     };
 
     let aiResponse = "";
     try {
       const response = await axios.post(geminiUrl, payload, {
         headers: { 'Content-Type': 'application/json' },
-        timeout: 8000
+        timeout: 15000
       });
+      // Log full response structure for debugging
+      if (!response.data?.candidates?.length) {
+        console.error("Gemini returned no candidates:", JSON.stringify(response.data));
+      }
       aiResponse = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     } catch (apiErr) {
-      console.error("Gemini API call failed:", apiErr.message);
+      const status = apiErr.response?.status;
+      const detail = apiErr.response?.data?.error?.message || apiErr.message;
+      console.error(`Gemini API call failed [${status}]:`, detail);
+      // Return a graceful not-found instead of propagating error to frontend
       return res.json({
         status: "Not Found",
-        message: "No matching information was found in the available knowledge sources (AI Search service error).",
+        answer: "The AI assistant is currently unavailable. Please use the search results below.",
+        source: "System",
         relatedTopics: []
       });
     }
