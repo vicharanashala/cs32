@@ -12,7 +12,7 @@ const recalculateSpurtiPoints = async () => {
     const userSpurtiMap = {};
     for (const item of answersGrouped) {
       if (item._id) {
-        userSpurtiMap[item._id.toString()] = item.count * 10;
+        userSpurtiMap[item._id.toString()] = item.count * 1;
       }
     }
 

@@ -356,6 +356,56 @@ exports.getSpurtiLogs = async (req, res, next) => {
 
     const total = await SpurtiPointLog.countDocuments({ user: req.user._id });
 
+    // Calculate detailed stats for the Spurti Bank UI
+    const totalUsers = await User.countDocuments({ isBanned: { $ne: true } });
+    const userSpurtiPoints = req.user.spurtiPoints || 0;
+    const rank = (await User.countDocuments({ isBanned: { $ne: true }, spurtiPoints: { $gt: userSpurtiPoints } })) + 1;
+    
+    const avgResult = await User.aggregate([
+      { $match: { isBanned: { $ne: true } } },
+      { $group: { _id: null, avgSp: { $avg: '$spurtiPoints' } } }
+    ]);
+    const cohortAvg = avgResult[0] ? Math.round(avgResult[0].avgSp * 10) / 10 : 0;
+
+    const top50User = await User.find({ isBanned: { $ne: true } })
+      .sort({ spurtiPoints: -1 })
+      .skip(Math.min(49, Math.max(0, totalUsers - 1)))
+      .limit(1)
+      .select('spurtiPoints');
+    const top50Cutoff = top50User[0]?.spurtiPoints || 0;
+
+    const top10User = await User.find({ isBanned: { $ne: true } })
+      .sort({ spurtiPoints: -1 })
+      .skip(Math.min(9, Math.max(0, totalUsers - 1)))
+      .limit(1)
+      .select('spurtiPoints');
+    const top10Cutoff = top10User[0]?.spurtiPoints || 0;
+
+    const nextUser = await User.find({
+      isBanned: { $ne: true },
+      spurtiPoints: { $gt: userSpurtiPoints }
+    })
+      .sort({ spurtiPoints: 1 })
+      .limit(1)
+      .select('spurtiPoints');
+    const nextRankSpNeeded = nextUser[0] ? (nextUser[0].spurtiPoints - userSpurtiPoints) : 0;
+    const top50SpNeeded = Math.max(0, top50Cutoff - userSpurtiPoints);
+
+    // Build chronological historical trend
+    const trendLogs = await SpurtiPointLog.find({ user: req.user._id })
+      .sort({ createdAt: 1 })
+      .limit(50)
+      .select('amount createdAt');
+    
+    let tempSp = 0;
+    const trend = trendLogs.map(l => {
+      tempSp += l.amount;
+      return {
+        date: l.createdAt,
+        sp: tempSp
+      };
+    });
+
     res.json({
       logs,
       pagination: {
@@ -363,6 +413,17 @@ exports.getSpurtiLogs = async (req, res, next) => {
         limit: limitNum,
         totalPages: Math.ceil(total / limitNum),
         total
+      },
+      stats: {
+        userSpurtiPoints,
+        rank,
+        totalUsers,
+        cohortAvg,
+        top50Cutoff,
+        top10Cutoff,
+        nextRankSpNeeded,
+        top50SpNeeded,
+        trend
       }
     });
   } catch (err) {

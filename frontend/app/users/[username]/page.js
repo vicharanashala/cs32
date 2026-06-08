@@ -22,6 +22,10 @@ export default function UserProfilePage() {
   const [tab, setTab] = useState('questions');
   const [savedSubTab, setSavedSubTab] = useState('questions');
   const [loading, setLoading] = useState(true);
+  const [spurtiLogs, setSpurtiLogs] = useState([]);
+  const [spurtiStats, setSpurtiStats] = useState(null);
+  const [spurtiPagination, setSpurtiPagination] = useState(null);
+  const [spurtiPage, setSpurtiPage] = useState(1);
 
   // Edit profile states
   const [showEditModal, setShowEditModal] = useState(false);
@@ -50,8 +54,16 @@ export default function UserProfilePage() {
       api.get('/users/me/saved').then(d => setSavedQuestions(d?.saved || [])).catch(() => {});
       api.get('/users/me/saved/faqs').then(d => setSavedFaqs(d?.saved || [])).catch(() => {});
       api.get('/questions/escalated').then(d => setEscalatedQuestions(d?.questions || [])).catch(() => {});
+    } else if (tab === 'spurti' && isOwnProfile) {
+      api.get(`/users/me/spurti-logs?page=${spurtiPage}&limit=10`)
+        .then(d => {
+          setSpurtiLogs(d?.logs || []);
+          setSpurtiStats(d?.stats || null);
+          setSpurtiPagination(d?.pagination || null);
+        })
+        .catch(() => {});
     }
-  }, [username, tab, isOwnProfile]);
+  }, [username, tab, isOwnProfile, spurtiPage]);
 
   const handleUpdateProfile = async (e) => {
     e.preventDefault();
@@ -263,16 +275,28 @@ export default function UserProfilePage() {
           Answers ({user.answerCount || 0})
         </button>
         {isOwnProfile && (
-          <button
-            onClick={() => setTab('saved')}
-            className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
-              tab === 'saved' 
-                ? 'border-[var(--color-primary)] text-[var(--color-primary)]' 
-                : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
-            }`}
-          >
-            Saved
-          </button>
+          <>
+            <button
+              onClick={() => setTab('saved')}
+              className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+                tab === 'saved' 
+                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]' 
+                  : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+              }`}
+            >
+              Saved
+            </button>
+            <button
+              onClick={() => setTab('spurti')}
+              className={`px-4 py-2.5 text-xs font-bold uppercase tracking-wider border-b-2 transition-all ${
+                tab === 'spurti' 
+                  ? 'border-[var(--color-primary)] text-[var(--color-primary)]' 
+                  : 'border-transparent text-[var(--color-text-muted)] hover:text-[var(--color-text)]'
+              }`}
+            >
+              ⚡ Spurti Bank
+            </button>
+          </>
         )}
       </div>
 
@@ -310,7 +334,7 @@ export default function UserProfilePage() {
             ))}
           </div>
         )
-      ) : (
+      ) : tab === 'saved' && isOwnProfile ? (
         <div>
           {isOwnProfile && (
             <div className="flex gap-2 mb-6 bg-[var(--color-bg-secondary)]/55 p-1 rounded-xl border border-[var(--color-border)]/40 w-fit">
@@ -396,7 +420,194 @@ export default function UserProfilePage() {
             )
           )}
         </div>
-      )}
+      ) : tab === 'spurti' && isOwnProfile ? (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between border-b border-[var(--color-border)]/40 pb-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-[var(--color-primary)]">Student Spurti Bank</p>
+              <h2 className="text-2xl font-extrabold text-[var(--color-text)]">{user.displayName || user.username}</h2>
+            </div>
+            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-4 text-right flex flex-col items-end shadow-sm">
+              <span className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)]">SP</span>
+              <span className="text-3xl font-extrabold text-[var(--color-primary)]">{user.spurtiPoints || 0}</span>
+              <span className="text-xs font-semibold text-[var(--color-text-secondary)] mt-1">Rank {spurtiStats?.rank || 'N/A'} of {spurtiStats?.totalUsers || 1}</span>
+            </div>
+          </div>
+
+          {/* Grid of Stats Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            {/* Standing */}
+            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm hover:border-[var(--color-primary)]/30 transition-all">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-2">Standing</p>
+              <p className="text-2xl font-extrabold text-[var(--color-text)]">Rank {spurtiStats?.rank || 'N/A'}</p>
+              <div className="text-xs text-[var(--color-text-secondary)] mt-2 space-y-1 font-medium">
+                {spurtiStats?.top50SpNeeded > 0 ? (
+                  <p>⚡ {spurtiStats.top50SpNeeded} SP needed for Top 50.</p>
+                ) : (
+                  <p className="text-emerald-500 font-semibold">✓ In Top 50!</p>
+                )}
+                {spurtiStats?.nextRankSpNeeded > 0 ? (
+                  <p>⚡ {spurtiStats.nextRankSpNeeded} SP needed for next rank.</p>
+                ) : (
+                  <p className="text-emerald-500 font-semibold">✓ Highest rank!</p>
+                )}
+              </div>
+            </div>
+
+            {/* Cohort Comparison */}
+            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm hover:border-[var(--color-primary)]/30 transition-all">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-2">Cohort Comparison</p>
+              <div className="text-xs space-y-1.5 font-semibold text-[var(--color-text-secondary)]">
+                <div className="flex justify-between">
+                  <span>Your SP:</span>
+                  <span className="text-[var(--color-text)]">{user.spurtiPoints || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Cohort Avg:</span>
+                  <span className="text-[var(--color-text)]">{spurtiStats?.cohortAvg || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Top 50 Cutoff:</span>
+                  <span className="text-[var(--color-text)]">{spurtiStats?.top50Cutoff || 0}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Top 10 Cutoff:</span>
+                  <span className="text-[var(--color-text)]">{spurtiStats?.top10Cutoff || 0}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Q&A Health */}
+            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm hover:border-[var(--color-primary)]/30 transition-all">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-2">Q&A Health</p>
+              <div className="text-xs space-y-2 font-medium">
+                <div>
+                  <p className="font-extrabold text-[var(--color-text)]">{user.answerCount || 0} verified answers</p>
+                  <p className="text-[9px] text-[var(--color-text-muted)]">1 SP credited per accepted answer</p>
+                </div>
+                <div>
+                  <p className="font-extrabold text-[var(--color-text)]">{user.reputation || 0} reputation points</p>
+                  <p className="text-[9px] text-[var(--color-text-muted)]">Earned from community feedback</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Badges */}
+            <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm hover:border-[var(--color-primary)]/30 transition-all">
+              <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-2">Badges</p>
+              {user.badges && user.badges.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {user.badges.map(badge => (
+                    <span key={badge} className="inline-flex items-center px-2 py-0.5 rounded bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-bold">
+                      🏆 {badge}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--color-text-secondary)] italic">No active badges yet. Keep contributing!</p>
+              )}
+            </div>
+          </div>
+
+          {/* SP Trend Section */}
+          <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm">
+            <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-4">SP Trend</p>
+            {spurtiStats?.trend && spurtiStats.trend.length > 0 ? (
+              <div className="flex items-end gap-1.5 h-36 pt-4 border-b border-[var(--color-border)]/45">
+                {spurtiStats.trend.map((t, idx) => {
+                  const maxSp = Math.max(...spurtiStats.trend.map(item => item.sp), 1);
+                  const pct = (t.sp / maxSp) * 100;
+                  return (
+                    <div key={idx} className="flex-1 flex flex-col items-center group relative h-full justify-end">
+                      <div 
+                        className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/80 rounded-t-sm transition-all duration-300"
+                        style={{ height: `${Math.max(5, pct)}%` }}
+                      />
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black/90 text-white text-[9px] py-1 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-md">
+                        {t.sp} SP ({new Date(t.date).toLocaleDateString()})
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="h-32 flex items-center justify-center border border-dashed border-[var(--color-border)] rounded-xl text-xs text-[var(--color-text-muted)]">
+                Not enough historical activity to plot trend yet.
+              </div>
+            )}
+          </div>
+
+          {/* What to do next */}
+          <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm">
+            <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-3">What to do next</p>
+            <ul className="text-xs text-[var(--color-text-secondary)] space-y-2 list-disc pl-4 font-medium">
+              <li>Answer questions in the community to earn <strong className="text-[var(--color-text)] font-extrabold">+1 Sp</strong> for each verified (accepted) answer.</li>
+              <li>Provide high-quality and genuine replies to gain accepted solutions and reputation points.</li>
+              <li>Check your Spurti Bank Statement regularly to monitor your real-time balance and contribution history.</li>
+            </ul>
+          </div>
+
+          {/* SP Bank Statement Table */}
+          <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm overflow-hidden">
+            <h3 className="text-lg font-bold text-[var(--color-text)] mb-4">SP Bank Statement</h3>
+            {spurtiLogs.length === 0 ? (
+              <div className="text-center py-8 text-xs text-[var(--color-text-secondary)]">
+                No transaction logs found for this account.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-[var(--color-border)]/50 pb-2 text-[var(--color-text-muted)] uppercase tracking-wider font-bold">
+                      <th className="py-2.5">Date & Time</th>
+                      <th className="py-2.5">Credit</th>
+                      <th className="py-2.5">Debit</th>
+                      <th className="py-2.5 font-bold">Reason</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border)]/35 text-[var(--color-text-secondary)] font-medium">
+                    {spurtiLogs.map((log) => {
+                      const isCredit = log.amount > 0;
+                      return (
+                        <tr key={log._id} className="hover:bg-[var(--color-bg)]/30 transition-colors">
+                          <td className="py-3">{new Date(log.createdAt).toLocaleString()}</td>
+                          <td className="py-3 font-bold text-emerald-500">{isCredit ? `+${log.amount}` : ''}</td>
+                          <td className="py-3 font-bold text-red-500">{!isCredit ? log.amount : ''}</td>
+                          <td className="py-3 text-[var(--color-text)]">{log.reason}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+
+                {/* Pagination */}
+                {spurtiPagination && spurtiPagination.totalPages > 1 && (
+                  <div className="flex items-center justify-between border-t border-[var(--color-border)]/30 mt-4 pt-4">
+                    <button
+                      onClick={() => setSpurtiPage(p => Math.max(1, p - 1))}
+                      disabled={spurtiPage === 1}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-bg-secondary)] transition-all cursor-pointer"
+                    >
+                      Previous
+                    </button>
+                    <span className="text-xs text-[var(--color-text-muted)]">
+                      Page {spurtiPage} of {spurtiPagination.totalPages}
+                    </span>
+                    <button
+                      onClick={() => setSpurtiPage(p => Math.min(spurtiPagination.totalPages, p + 1))}
+                      disabled={spurtiPage === spurtiPagination.totalPages}
+                      className="px-3 py-1.5 text-xs font-semibold rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--color-bg-secondary)] transition-all cursor-pointer"
+                    >
+                      Next
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
 
       {/* Edit Profile Modal */}
       {showEditModal && (
