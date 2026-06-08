@@ -545,13 +545,15 @@ export default function AdminPage() {
           <button onClick={clearCache} className="btn-secondary btn-sm">Clear Cache</button>
         )}
       </div>
-      <div className="flex gap-1 mb-6 border-b border-[var(--color-border)] overflow-x-auto">
+      <div className="flex flex-wrap gap-2 mb-8 pb-4 border-b border-[var(--color-border)]">
         {tabs.map(t => (
           <button
             key={t}
             onClick={() => setTab(t)}
-            className={`px-4 py-2 text-sm font-medium whitespace-nowrap border-b-2 transition-colors ${
-              tab === t ? 'border-primary-600 text-primary-600' : 'border-transparent text-[var(--color-text-secondary)] hover:text-[var(--color-text)]'
+            className={`px-4 py-2 text-sm font-semibold rounded-full transition-all duration-200 ${
+              tab === t
+                ? 'bg-primary-600 text-white shadow-md shadow-primary-500/20 scale-105'
+                : 'bg-[var(--color-border)] text-[var(--color-text-secondary)] hover:bg-[var(--color-bg-secondary)] hover:text-[var(--color-text)]'
             }`}
           >
             {t === 'moderationQueue' ? 'Moderation Queue' :

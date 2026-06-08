@@ -461,7 +461,29 @@ exports.deleteQuestion = async (req, res, next) => {
       reason: `Deleted question: "${question.title}"`
     });
 
+    const Answer = require('../models/Answer');
+    const User = require('../models/User');
+    // Gather authors of non-deleted answers before cascading deletion
+    const cascadedAnswers = await Answer.find({ question: question._id, isDeleted: false }).select('author');
+    await Answer.updateMany({ question: question._id }, { isDeleted: true });
+    // Decrement each author's answerCount
+    for (const a of cascadedAnswers) {
+      if (a.author) {
+        await User.findByIdAndUpdate(a.author, { $inc: { answerCount: -1 } });
+      }
+    }
+
     await deleteQuestionIndex(question._id);
+
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'delete_question', questionId: question._id });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in deleteQuestion:', err.message);
+    }
+
     res.json({ message: 'Question deleted' });
   } catch (err) {
     next(err);

@@ -625,7 +625,7 @@ exports.rejectPost = async (req, res, next) => {
     const AuditLog = require('../models/AuditLog');
 
     let post;
-    if (postType === 'Question') {
+    if (postType && postType.toLowerCase() === 'question') {
       post = await Question.findById(postId);
     } else {
       post = await Answer.findById(postId);
@@ -636,6 +636,22 @@ exports.rejectPost = async (req, res, next) => {
     post.visibility = 'hidden';
     post.isDeleted = true; // Mark as deleted so it won't appear
     await post.save();
+
+    if (postType && postType.toLowerCase() === 'question') {
+      const Answer = require('../models/Answer');
+      // Find all non-deleted answers before bulk-marking them deleted
+      const affectedAnswers = await Answer.find({ question: post._id, isDeleted: false }).select('author');
+      await Answer.updateMany({ question: post._id }, { isDeleted: true, visibility: 'hidden' });
+      // Decrement each answer author's answerCount
+      for (const a of affectedAnswers) {
+        if (a.author) {
+          await User.findByIdAndUpdate(a.author, { $inc: { answerCount: -1 } });
+        }
+      }
+    } else {
+      // Single answer rejected — decrement its author's answerCount
+      await User.findByIdAndUpdate(post.author, { $inc: { answerCount: -1 } });
+    }
 
     // Post rejection emails are disabled to prevent non-compliant outbound emails
 

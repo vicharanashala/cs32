@@ -220,6 +220,9 @@ exports.deleteAnswer = async (req, res, next) => {
     answer.status = 'deleted';
     await answer.save();
 
+    // Decrement the author's answerCount so the profile stat stays accurate
+    await User.findByIdAndUpdate(answer.author, { $inc: { answerCount: -1 } });
+
     const AuditLog = require('../models/AuditLog');
     const Question = require('../models/Question');
     const parentQuestion = await Question.findById(answer.question);
@@ -235,6 +238,16 @@ exports.deleteAnswer = async (req, res, next) => {
 
     const { recalculateAnswerCount } = require('../utils/helpers');
     await recalculateAnswerCount(answer.question);
+
+    try {
+      const { emitToAdmin } = require('../socket');
+      emitToAdmin('moderation:updated', { action: 'delete_answer', answerId: answer._id });
+      const { broadcastLeaderboard } = require('../services/leaderboardService');
+      await broadcastLeaderboard();
+    } catch (err) {
+      console.error('Socket notification error in deleteAnswer:', err.message);
+    }
+
     res.json({ message: 'Answer deleted' });
   } catch (err) {
     next(err);

@@ -4,15 +4,17 @@ const { getIO } = require('../socket');
 
 const recalculateSpurtiPoints = async () => {
   try {
-    const answersGrouped = await Answer.aggregate([
-      { $match: { isAccepted: true, isDeleted: { $ne: true }, status: { $ne: 'deleted' } } },
-      { $group: { _id: '$author', count: { $sum: 1 } } }
+    const SpurtiPointLog = require('../models/SpurtiPointLog');
+    // Derive spurtiPoints from the authoritative log sum, not raw answer counts.
+    // This preserves base points, bonuses, and all credited transactions.
+    const logTotals = await SpurtiPointLog.aggregate([
+      { $group: { _id: '$user', totalSp: { $sum: '$amount' } } }
     ]);
 
     const userSpurtiMap = {};
-    for (const item of answersGrouped) {
+    for (const item of logTotals) {
       if (item._id) {
-        userSpurtiMap[item._id.toString()] = item.count * 1;
+        userSpurtiMap[item._id.toString()] = Math.max(0, item.totalSp);
       }
     }
 

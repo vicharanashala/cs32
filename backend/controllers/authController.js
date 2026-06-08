@@ -32,10 +32,24 @@ exports.register = async (req, res, next) => {
       throw new AppError('Username or email already exists', 409);
     }
 
-    const user = new User({ username, email, password, displayName: username });
+    const user = new User({ username, email, password, displayName: username, spurtiPoints: 10 });
     applyDailyLoginBenefit(user);
     await user.save();
     await indexUser(user);
+
+    // Credit 10 base Spurti Points on registration
+    try {
+      const SpurtiPointLog = require('../models/SpurtiPointLog');
+      await SpurtiPointLog.create({
+        user: user._id,
+        amount: 10,
+        action: 'reward',
+        reason: 'Base Spurti Points credited on account registration',
+      });
+    } catch (spErr) {
+      console.error('Failed to create base SP log:', spErr.message);
+    }
+
     const token = generateToken(user);
 
     res.status(201).json({
@@ -313,9 +327,23 @@ exports.googleLogin = async (req, res, next) => {
       avatarUrl: picture || '',
       authProvider: 'google',
       hasCompletedOnboarding: false,
+      spurtiPoints: 10,
     });
     applyDailyLoginBenefit(user);
     await user.save();
+
+    // Credit 10 base Spurti Points on registration
+    try {
+      const SpurtiPointLog = require('../models/SpurtiPointLog');
+      await SpurtiPointLog.create({
+        user: user._id,
+        amount: 10,
+        action: 'reward',
+        reason: 'Base Spurti Points credited on account registration',
+      });
+    } catch (spErr) {
+      console.error('Failed to create base SP log (Google):', spErr.message);
+    }
 
     await indexUser(user);
     const jwtToken = generateToken(user);

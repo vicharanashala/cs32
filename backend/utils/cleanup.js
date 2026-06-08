@@ -91,13 +91,75 @@ const cleanupOrphanedData = async () => {
       }
     }
 
-    // Recalculate answer counts
+    // Recalculate answer counts on Question documents
     const activeQs = await Question.find({}, '_id');
     for (const q of activeQs) {
       await recalculateAnswerCount(q._id);
     }
 
-    console.log(`[Cleanup] Finished. Orphaned Qs deleted: ${orphanedQs}, Orphaned As deleted: ${orphanedAs}`);
+    // 5b. Sync User.answerCount from actual non-deleted answers (one-time repair)
+    console.log('[Cleanup] Syncing User.answerCount from live answer data...');
+    const allUserIds = await User.find({}, '_id').lean();
+    let syncedUsers = 0;
+    for (const u of allUserIds) {
+      const actualCount = await Answer.countDocuments({ author: u._id, isDeleted: false });
+      const dbUser = await User.findById(u._id).select('answerCount');
+      if (dbUser && dbUser.answerCount !== actualCount) {
+        await User.updateOne({ _id: u._id }, { $set: { answerCount: actualCount } });
+        syncedUsers++;
+      }
+    }
+    console.log(`[Cleanup] Synced answerCount for ${syncedUsers} users.`);
+
+    // 6. Ensure all users have their 10 base Spurti Points and logs
+    const SpurtiPointLog = require('../models/SpurtiPointLog');
+    const allUsers = await User.find({});
+    let creditedCount = 0;
+    for (const u of allUsers) {
+      const existingLog = await SpurtiPointLog.findOne({
+        user: u._id,
+        reason: 'Base Spurti Points credited on account registration'
+      });
+      if (!existingLog) {
+        console.log(`[Cleanup] Crediting base 10 Sp points to existing user: ${u.username}`);
+        await SpurtiPointLog.create({
+          user: u._id,
+          amount: 10,
+          action: 'reward',
+          reason: 'Base Spurti Points credited on account registration',
+        });
+        u.spurtiPoints = (u.spurtiPoints || 0) + 10;
+        await u.save();
+        creditedCount++;
+      }
+    }
+
+    // 6b. Resync User.spurtiPoints from log sum (fixes corruption from old recalculation logic)
+    console.log('[Cleanup] Resyncing spurtiPoints from SpurtiPointLog totals...');
+    const logTotals = await SpurtiPointLog.aggregate([
+      { $group: { _id: '$user', totalSp: { $sum: '$amount' } } }
+    ]);
+    let spSyncedCount = 0;
+    for (const entry of logTotals) {
+      const correctSp = Math.max(0, entry.totalSp);
+      const targetUser = await User.findById(entry._id).select('spurtiPoints');
+      if (targetUser && targetUser.spurtiPoints !== correctSp) {
+        await User.updateOne({ _id: entry._id }, { $set: { spurtiPoints: correctSp } });
+        spSyncedCount++;
+      }
+    }
+    console.log(`[Cleanup] Resynced spurtiPoints for ${spSyncedCount} users from log data.`);
+
+    if (creditedCount > 0 || spSyncedCount > 0) {
+      try {
+        const { broadcastLeaderboard } = require('../services/leaderboardService');
+        await broadcastLeaderboard();
+      } catch (err) {
+        console.error('[Cleanup] Error broadcasting leaderboard:', err.message);
+      }
+    }
+
+    console.log(`[Cleanup] Finished. Orphaned Qs deleted: ${orphanedQs}, Orphaned As deleted: ${orphanedAs}, Credited Sp to ${creditedCount} existing users, Resynced SP for ${spSyncedCount} users.`);
   } catch (err) {
     console.error('[Cleanup] Error during database cleanup:', err.message);
   }
