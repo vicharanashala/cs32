@@ -58,12 +58,13 @@ export default function FAQDetailPage() {
         const index = faq.items.findIndex(item => item._id === hashId);
         if (index !== -1) {
           setActiveItem(index);
+          setOpenItems(prev => ({ ...prev, [index]: true }));
           setTimeout(() => {
             const element = document.getElementById(hashId);
             if (element) {
               element.scrollIntoView({ behavior: 'smooth', block: 'start' });
             }
-          }, 100);
+          }, 150);
         }
       }
     };

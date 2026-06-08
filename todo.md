@@ -653,7 +653,18 @@ Medium-Impact Quality of Life
 
 #### Latest Fixes (June 8, 2026)
 
-1. **Escalation Workflow and Owner Controls**
+1. **Base Spurti Points Grant on Registration**
+   * *Resolution*: Implemented Mongoose pre-save and post-save hooks on the User schema to automatically award new users (both email signups and Google login) with **10 base Spurti Points (Sp)** and log this transaction as a credit in the `SpurtiPointLog` statement ledger.
+2. **SP Trend Chart Removal**
+   * *Resolution*: Removed the SP Trend visualization section from the user profile's Spurti Bank dashboard to simplify the point statement UI per user request.
+3. **Suspicious Activity Tracking Cleanup**
+   * *Resolution*: Completely removed the "Suspicious Activity Logs" tab from the Admin Panel. Deleted associated models, endpoints, controllers (`getSuspiciousActivity`, `resolveSuspiciousActivity`), routing, and tracking middleware blocks inside `spamGuard.js`.
+4. **Relaxed Search Query Relevance & Fuzziness**
+   * *Resolution*: Configured Elasticsearch queries inside `searchService.js` to use `fuzziness: 'AUTO'` and removed strict word count/overlap (`minimum_should_match`) limits. Updated Mongoose database fallback search queries to use permissive `$or` matching instead of strict `$and` checks, allowing partial match inquiries to return relevant FAQs, questions, and users successfully.
+5. **FAQ Redirect and Auto-Expansion**
+   * *Resolution*: Fixed the redirection issue by modifying `frontend/app/faqs/[slug]/page.js` to automatically set the item's `openItems` state to `true` when parsing a URL hash (e.g. from search results), successfully expanding the target FAQ question on page load.
+
+6. **Escalation Workflow and Owner Controls**
    * *Resolution*: Updated the frontend and backend authorization logic. Restressed escalation controls so that only the question's author can trigger an escalation request. Added a check to hide or block escalation if another user has already answered the query.
 2. **Duplicate Escalation Prevention**
    * *Resolution*: Enhanced the backend `escalateQuestion` controller to automatically search for any existing, unresolved escalations on the same topic/tags before permitting a new one, preventing duplicate escalations on overlapping queries.

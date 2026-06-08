@@ -35,7 +35,6 @@ export default function AdminPage() {
 
   const [moderationQueue, setModerationQueue] = useState({ questions: [], answers: [] });
   const [reportedPosts, setReportedPosts] = useState([]);
-  const [suspiciousActivities, setSuspiciousActivities] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
 
   // Email System States
@@ -178,8 +177,6 @@ export default function AdminPage() {
           await fetchModerationQueue();
         } else if (tab === 'reportedPosts') {
           await fetchReportedPosts();
-        } else if (tab === 'suspiciousActivities') {
-          await fetchSuspiciousActivities();
         } else if (tab === 'auditLogs') {
           await fetchAuditLogs();
         } else if (tab === 'escalations') {
@@ -220,8 +217,6 @@ export default function AdminPage() {
         fetchModerationQueue();
       } else if (tab === 'reportedPosts') {
         fetchReportedPosts();
-      } else if (tab === 'suspiciousActivities') {
-        fetchSuspiciousActivities();
       } else if (tab === 'auditLogs') {
         fetchAuditLogs();
       } else if (tab === 'escalations') {
@@ -395,15 +390,7 @@ export default function AdminPage() {
       toast.error(err.message || 'Failed to resolve anomaly');
     }
   };
-  const handleResolveSuspicious = async (id) => {
-    try {
-      await api.post(`/admin/moderation/suspicious/${id}/resolve`);
-      toast.success('Suspicious activity marked as resolved');
-      fetchSuspiciousActivities();
-    } catch (err) {
-      toast.error(err.message || 'Failed to resolve suspicious activity');
-    }
-  };
+
   const fetchSiteReports = async () => {
     try {
       const data = await api.get('/admin/reports');
@@ -475,12 +462,6 @@ export default function AdminPage() {
     } catch (_) {}
   };
 
-  const fetchSuspiciousActivities = async () => {
-    try {
-      const data = await api.get('/admin/moderation/suspicious');
-      setSuspiciousActivities(data.activities || []);
-    } catch (_) {}
-  };
 
   const fetchAuditLogs = async () => {
     try {
@@ -538,7 +519,7 @@ export default function AdminPage() {
 
   const tabs = ['dashboard', 'users', 'flagged', 'anomalies'];
   if (user?.role === 'admin' || user?.role === 'moderator') {
-    tabs.push('moderationQueue', 'reportedPosts', 'suspiciousActivities', 'auditLogs', 'escalations');
+    tabs.push('moderationQueue', 'reportedPosts', 'auditLogs', 'escalations');
   }
   if (user?.role === 'admin') {
     tabs.push('siteReports', 'emails', 'broadcast', 'broadcastEmail', 'appUpdates', 'spurti');
@@ -575,7 +556,6 @@ export default function AdminPage() {
           >
             {t === 'moderationQueue' ? 'Moderation Queue' :
              t === 'reportedPosts' ? 'Reported Content' :
-             t === 'suspiciousActivities' ? 'Suspicious Activity' :
              t === 'auditLogs' ? 'Audit Logs' :
              t === 'siteReports' ? 'Site Reports' :
              t === 'emails' ? 'Email Queue' :
@@ -1289,83 +1269,6 @@ export default function AdminPage() {
                       </tr>
                     );
                   })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ) : tab === 'suspiciousActivities' ? (
-        <div className="card overflow-hidden">
-          <div className="p-5 border-b border-[var(--color-border)] bg-gradient-to-r from-red-500/5 to-amber-500/5">
-            <h3 className="font-bold text-lg text-[var(--color-text)]">Suspicious Activity Logs ({suspiciousActivities.length})</h3>
-            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-              Tracks sybil accounts, duplicate IPs, or matching browser fingerprints.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Type</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Shared Identifier</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Flagged Accounts</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Confidence</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Status</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Date</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
-                {suspiciousActivities.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="text-center p-8 text-[var(--color-text-secondary)]">
-                      No suspicious activity flags detected.
-                    </td>
-                  </tr>
-                ) : (
-                  suspiciousActivities.map(act => (
-                    <tr key={act._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                      <td className="px-4 py-3">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-600 dark:text-amber-400 capitalize">
-                          {act.activityType}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono text-xs text-[var(--color-text)]">{act.sharedValue}</td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {act.affectedUsers?.map(usr => (
-                            <span key={usr._id} className="text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border)] px-1.5 py-0.5 rounded text-[var(--color-text-secondary)]">
-                              @{usr.username}
-                            </span>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-[var(--color-text)]">{act.confidenceScore}%</td>
-                      <td className="px-4 py-3">
-                        {act.isResolved ? (
-                          <div className="text-xs">
-                            <span className="badge-green">Resolved</span>
-                            {act.resolvedBy && (
-                              <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">by @{act.resolvedBy.username}</p>
-                            )}
-                          </div>
-                        ) : (
-                          <span className="badge-red">Unresolved</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">{formatDate(act.flagDate)}</td>
-                      <td className="px-4 py-3">
-                        {!act.isResolved && (
-                          <button
-                            onClick={() => handleResolveSuspicious(act._id)}
-                            className="btn-primary btn-sm px-3 py-1 text-xs"
-                          >
-                            Mark Resolved
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                  ))
                 )}
               </tbody>
             </table>

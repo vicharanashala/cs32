@@ -104,6 +104,11 @@ userSchema.index({ username: 'text', displayName: 'text', bio: 'text' });
 userSchema.index({ role: 1 });
 
 userSchema.pre('save', async function (next) {
+  if (this.isNew) {
+    this.spurtiPoints = 10;
+    this._isNewUser = true;
+  }
+
   // Update trust level based on trust score
   if (this.isModified('trustScore') || this.isNew) {
     if (this.trustScore <= 50) {
@@ -117,6 +122,27 @@ userSchema.pre('save', async function (next) {
 
   if (!this.password || !this.isModified('password')) return next();
   this.password = await bcrypt.hash(this.password, 12);
+  next();
+});
+
+userSchema.post('save', async function (doc, next) {
+  if (this._isNewUser) {
+    this._isNewUser = false;
+    try {
+      const SpurtiPointLog = mongoose.model('SpurtiPointLog');
+      const existingLog = await SpurtiPointLog.findOne({ user: doc._id, reason: 'Base Spurti Points credited on account registration' });
+      if (!existingLog) {
+        await SpurtiPointLog.create({
+          user: doc._id,
+          amount: 10,
+          action: 'reward',
+          reason: 'Base Spurti Points credited on account registration',
+        });
+      }
+    } catch (err) {
+      console.error('Error creating initial SpurtiPointLog:', err.message);
+    }
+  }
   next();
 });
 

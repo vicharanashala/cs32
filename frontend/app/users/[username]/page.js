@@ -509,35 +509,6 @@ export default function UserProfilePage() {
             </div>
           </div>
 
-          {/* SP Trend Section */}
-          <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm">
-            <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-4">SP Trend</p>
-            {spurtiStats?.trend && spurtiStats.trend.length > 0 ? (
-              <div className="flex items-end gap-1.5 h-36 pt-4 border-b border-[var(--color-border)]/45">
-                {spurtiStats.trend.map((t, idx) => {
-                  const maxSp = Math.max(...spurtiStats.trend.map(item => item.sp), 1);
-                  const pct = (t.sp / maxSp) * 100;
-                  return (
-                    <div key={idx} className="flex-1 flex flex-col items-center group relative h-full justify-end">
-                      <div 
-                        className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary)]/80 rounded-t-sm transition-all duration-300"
-                        style={{ height: `${Math.max(5, pct)}%` }}
-                      />
-                      {/* Tooltip */}
-                      <div className="absolute bottom-full mb-1 left-1/2 -translate-x-1/2 bg-black/90 text-white text-[9px] py-1 px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10 shadow-md">
-                        {t.sp} SP ({new Date(t.date).toLocaleDateString()})
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="h-32 flex items-center justify-center border border-dashed border-[var(--color-border)] rounded-xl text-xs text-[var(--color-text-muted)]">
-                Not enough historical activity to plot trend yet.
-              </div>
-            )}
-          </div>
-
           {/* What to do next */}
           <div className="bg-[var(--color-bg-secondary)] border border-[var(--color-border)]/60 rounded-2xl p-5 shadow-sm">
             <p className="text-[10px] uppercase font-bold tracking-wider text-[var(--color-text-muted)] mb-3">What to do next</p>
