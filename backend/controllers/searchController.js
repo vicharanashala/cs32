@@ -233,34 +233,52 @@ Generate the response matching the specified guidelines. Do not output anything 
       });
     }
 
-    const modelName = 'gemini-2.5-flash';
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
-    const payload = {
-      contents: [{
-        parts: [{ text: userPrompt }]
-      }],
-      generationConfig: {
-        temperature: 0.2,
-        maxOutputTokens: 1024,
-      }
-    };
+    const modelsToTry = [
+      'gemini-3.1-flash-lite',
+      'gemini-2.5-flash',
+      'gemini-3.5-flash',
+      'gemini-2.0-flash'
+    ];
 
     let aiResponse = "";
-    try {
-      const response = await axios.post(geminiUrl, payload, {
-        headers: { 'Content-Type': 'application/json' },
-        timeout: 15000
-      });
-      // Log full response structure for debugging
-      if (!response.data?.candidates?.length) {
-        console.error("Gemini returned no candidates:", JSON.stringify(response.data));
+    let lastErrorMsg = "";
+    let lastErrorStatus = null;
+
+    for (const modelName of modelsToTry) {
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent?key=${apiKey}`;
+      const payload = {
+        contents: [{
+          parts: [{ text: userPrompt }]
+        }],
+        generationConfig: {
+          temperature: 0.2,
+          maxOutputTokens: 1024,
+        }
+      };
+
+      try {
+        console.log(`Trying Gemini model: ${modelName}`);
+        const response = await axios.post(geminiUrl, payload, {
+          headers: { 'Content-Type': 'application/json' },
+          timeout: 15000
+        });
+        
+        if (response.data?.candidates?.[0]?.content?.parts?.[0]?.text) {
+          aiResponse = response.data.candidates[0].content.parts[0].text;
+          console.log(`Gemini model ${modelName} succeeded!`);
+          break; // Exit the loop on success
+        } else {
+          console.warn(`Gemini model ${modelName} returned empty response`);
+        }
+      } catch (apiErr) {
+        lastErrorStatus = apiErr.response?.status;
+        lastErrorMsg = apiErr.response?.data?.error?.message || apiErr.message;
+        console.error(`Gemini model ${modelName} failed [${lastErrorStatus}]:`, lastErrorMsg);
       }
-      aiResponse = response.data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    } catch (apiErr) {
-      const status = apiErr.response?.status;
-      const detail = apiErr.response?.data?.error?.message || apiErr.message;
-      console.error(`Gemini API call failed [${status}]:`, detail);
-      // Return a graceful not-found instead of propagating error to frontend
+    }
+
+    if (!aiResponse) {
+      console.error("All Gemini models failed. Last error:", lastErrorMsg);
       return res.json({
         status: "Not Found",
         answer: "The AI assistant is currently unavailable. Please use the search results below.",
