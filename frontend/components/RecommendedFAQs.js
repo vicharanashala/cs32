@@ -105,7 +105,12 @@ export default function RecommendedFAQs({ limit = 6, layout = 'grid', category =
   const filtered = category === 'All Categories'
     ? faqs
     : faqs.filter(faq => faq.category === category);
-  const slicedFaqs = filtered.slice(0, limit);
+
+  const recommendedOnly = (user && user.currentPhase)
+    ? filtered.filter(faq => faq.phaseMatch || (faq.matchingTagsCount && faq.matchingTagsCount > 0))
+    : filtered;
+
+  const slicedFaqs = recommendedOnly.slice(0, limit);
 
   // Guest or no-phase: show a gentle CTA to set phase, then show official/trending FAQs
   if (isGuestOrNoPhase) {

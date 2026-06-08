@@ -836,7 +836,7 @@ All code changes have been committed and pushed to `main` on GitHub. Reload the 
    * *Resolution*: Refactored `frontend/app/page.js` to conditionally render:
      - Guest users: Display all FAQs.
      - Logged-in users: Display Recommended FAQs filtered by the selected sidebar category, removing the nested container to present a clean, personalized dashboard.
-   * *RecommendedFAQs*: Updated the component to accept the `category` prop, allowing client-side category filtering of recommended FAQs.
+   * *RecommendedFAQs*: Updated the component to accept the `category` prop, allowing client-side category filtering of recommended FAQs. Added strict filtering so that logged-in users with a set phase only see FAQs matching their phase or tag affinity, excluding any unrelated fallback FAQs from their view.
 
 2. **Universal Identity Anonymization**
    * *Resolution*: Modified `backend/controllers/questionController.js` endpoints (`getQuestions`, `getQuestion`, `updateQuestion`, and `getSimilarQuestions`) to unconditionally strip the author's real identity and replace it with "Anonymous Student" when the question is anonymous, hiding it for all roles (including admins and moderators) in the UI.
