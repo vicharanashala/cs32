@@ -132,21 +132,6 @@ prashnasarathi/
 │   ├── lib/              # API client & utilities
 │   ├── services/         # Frontend services (admin analytics, etc.)
 │   └── styles/           # Global CSS
-├── capacitor-app/        # Capacitor Native App (Android & iOS wrappers)
-│   ├── android/          # Native Android Gradle project
-│   ├── resources/        # Launcher icons, splash screen assets
-│   ├── package.json      # Dependencies and synchronization tasks
-│   └── capacitor.config.ts # Core configuration mapping to live website host
-├── desktop-app/          # Electron Windows Desktop App (.exe wrapper)
-│   ├── Installer.cs      # C# custom installer package script
-│   ├── build-installer.ps1 # PowerShell build execution script
-│   ├── main.js           # Electron main process script
-│   └── package.json      # Electron app packaging configuration
-├── tauri-app/            # Tauri Desktop App (.exe alternative)
-│   ├── src-tauri/        # Rust backend configurations, Cargo manifest, build scripts
-│   ├── out/              # Static HTML build artifact output folder
-│   ├── package.json      # Desktop app build tasks
-│   └── tauri.conf.json   # Tauri features, allowlists, and window parameters
 ├── FastAPI_python_model/ # FastAPI AI microservice (spam & noise classification)
 │   ├── main.py           # FastAPI server entry point
 │   ├── Dockerfile        # Container setup for Python dependencies

@@ -818,3 +818,14 @@ All code changes have been committed and pushed to `main` on GitHub. Reload the 
 4. **Startup Repair Migrations in cleanup.js**
    * Added `User.answerCount` resync from live non-deleted Answer counts on every server startup (one-time correction for existing stale data).
    * Added `User.spurtiPoints` resync from `SpurtiPointLog` aggregate totals on every startup (corrects users whose SP was corrupted by the old raw-count recalculation).
+
+#### Admin Dashboard Cleanup & Search Optimization (June 8, 2026)
+
+1. **Admin Dashboard Cleanup & Workflow Consolidation**
+   * *Resolution*: Consolidated moderation and report workflows. Combined "Flagged Content" and "Reported Content" views, and merged the "Anomalies" list into the unified "Escalations" workflow. Purged legacy maintenance controls, including the deprecated `🔧 Data Integrity Repair` tools and legacy app update management cards.
+2. **Search Redirection & Fallback Tag Mapping**
+   * *Resolution*: Added robust keyboard submission hooks on the root page search bar input to guarantee reliable URL routing. Corrected the MongoDB fallback search service mapper to correctly map `tagNames` to the `tags` key of search cards, aligning it with the Elasticsearch schemas and restoring tags to fallback results.
+3. **Accessibility Typography & Mobile Table Layouts**
+   * *Resolution*: Increased the baseline font size to `16.5px` inside `frontend/styles/globals.css` for a system-wide typography scale enhancement. Restructured all administration tables with `overflow-x-auto` wrappers and explicit minimum widths to maintain readability on mobile viewports.
+4. **Architectural Readme Updates**
+   * *Resolution*: Cleaned the root `README.md` directory map to reflect the native app codebase deprecations. Created dedicated `README.md` files inside `/frontend` and `/backend` describing current component responsibilities, operations, and caching/search mechanics.
