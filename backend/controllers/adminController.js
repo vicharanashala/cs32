@@ -384,9 +384,15 @@ exports.clearCache = async (req, res) => {
   try {
     const redis = getRedis();
     await redis.flushall();
-    res.json({ message: 'Cache cleared' });
+    try {
+      const { syncToElasticsearch } = require('../services/searchService');
+      await syncToElasticsearch();
+    } catch (esErr) {
+      console.error('Failed to sync ES indices during cache clear:', esErr.message);
+    }
+    res.json({ message: 'Cache and search indices cleared' });
   } catch (_) {
-    res.json({ message: 'Cache not available' });
+    res.json({ message: 'Cache or search not available' });
   }
 };
 
@@ -1164,80 +1170,3 @@ exports.getSpurtiLogs = async (req, res, next) => {
 };
 
 
-// Admin-triggered full data repair: fixes SP logs, spurtiPoints, and answerCount for all users
-exports.runDataRepair = async (req, res, next) => {
-  try {
-    const SpurtiPointLog = require('../models/SpurtiPointLog');
-    let results = { retroLogs: 0, baseCredited: 0, spResynced: 0, answerCountSynced: 0 };
-
-    // 1. Backfill SP logs for historic accepted answers
-    const acceptedAnswers = await Answer.find({ isAccepted: true }).select('_id author question');
-    for (const ans of acceptedAnswers) {
-      if (!ans.author) continue;
-      const exists = await SpurtiPointLog.findOne({ referenceId: ans._id, referenceType: 'Answer', action: 'reward', amount: 1 });
-      if (!exists) {
-        const parentQ = await Question.findById(ans.question).select('title');
-        await SpurtiPointLog.create({
-          user: ans.author,
-          amount: 1,
-          action: 'reward',
-          reason: `Answer accepted on question: "${parentQ ? parentQ.title : 'Unknown'}"`,
-          referenceType: 'Answer',
-          referenceId: ans._id
-        });
-        results.retroLogs++;
-      }
-    }
-
-    // 2. Ensure base 10 SP log for every user
-    const allUsers = await User.find({}).select('_id username spurtiPoints');
-    for (const u of allUsers) {
-      const existingBase = await SpurtiPointLog.findOne({
-        user: u._id,
-        reason: 'Base Spurti Points credited on account registration'
-      });
-      if (!existingBase) {
-        await SpurtiPointLog.create({
-          user: u._id,
-          amount: 10,
-          action: 'reward',
-          reason: 'Base Spurti Points credited on account registration',
-        });
-        results.baseCredited++;
-      }
-    }
-
-    // 3. Resync spurtiPoints from log sum for all users
-    const logTotals = await SpurtiPointLog.aggregate([
-      { $group: { _id: '$user', totalSp: { $sum: '$amount' } } }
-    ]);
-    for (const entry of logTotals) {
-      const correctSp = Math.max(0, entry.totalSp);
-      const u = await User.findById(entry._id).select('spurtiPoints');
-      if (u && u.spurtiPoints !== correctSp) {
-        await User.updateOne({ _id: entry._id }, { $set: { spurtiPoints: correctSp } });
-        results.spResynced++;
-      }
-    }
-
-    // 4. Sync User.answerCount from actual non-deleted answers
-    for (const u of allUsers) {
-      const actualCount = await Answer.countDocuments({ author: u._id, isDeleted: { $ne: true } });
-      if (u.answerCount !== actualCount) {
-        await User.updateOne({ _id: u._id }, { $set: { answerCount: actualCount } });
-        results.answerCountSynced++;
-      }
-    }
-
-    // Broadcast updated leaderboard
-    try {
-      const { broadcastLeaderboard } = require('../services/leaderboardService');
-      await broadcastLeaderboard();
-    } catch (err) { /* socket may not be ready */ }
-
-    console.log('[Admin] Data repair completed:', results);
-    res.json({ message: 'Data repair completed successfully', results });
-  } catch (err) {
-    next(err);
-  }
-};

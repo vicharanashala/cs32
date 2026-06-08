@@ -41,6 +41,5 @@ router.post('/alert', auth, adminOnly, ctrl.sendAdminAlert);
 router.post('/emails/broadcast', auth, adminOnly, ctrl.sendEmailBroadcast);
 router.post('/app-version', auth, adminOnly, ctrl.updateAppVersion);
 router.get('/spurti-logs', auth, adminOnly, ctrl.getSpurtiLogs);
-router.post('/repair-data', auth, adminOnly, ctrl.runDataRepair);
 
 module.exports = router;

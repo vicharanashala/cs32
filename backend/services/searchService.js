@@ -439,7 +439,7 @@ const searchAll = async ({ query, tags, type, page = 1, limit = 20 }) => {
               id: q._id.toString(),
               title: q.title,
               body: q.body,
-              tags: q.tags || [],
+              tags: q.tagNames || [],
               authorName: q.author ? (q.author.displayName || q.author.username) : 'anonymous',
               createdAt: q.createdAt,
               _type: 'question',

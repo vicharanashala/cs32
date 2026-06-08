@@ -33,7 +33,7 @@ export default function Navbar({ onSearch }) {
     e.preventDefault();
     if (onSearch) onSearch(searchQuery);
     if (searchQuery.trim()) {
-      window.location.href = `/search?q=${encodeURIComponent(searchQuery)}`;
+      router.push(`/search?q=${encodeURIComponent(searchQuery)}`);
     }
   };
 

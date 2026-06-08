@@ -31,7 +31,6 @@ export default function AdminPage() {
   const [spurtiPage, setSpurtiPage] = useState(1);
   const [spurtiPagination, setSpurtiPagination] = useState({ page: 1, pages: 1 });
   const [spurtiSearch, setSpurtiSearch] = useState('');
-  const [repairRunning, setRepairRunning] = useState(false);
   const socket = useSocket();
 
   const [moderationQueue, setModerationQueue] = useState({ questions: [], answers: [] });
@@ -73,14 +72,6 @@ export default function AdminPage() {
   const [emailContentTitle, setEmailContentTitle] = useState('Admin Broadcast Announcement');
   const [sendingEmail, setSendingEmail] = useState(false);
 
-  // App Updates States
-  const [appVersion, setAppVersion] = useState('1.1.0');
-  const [appVersionCode, setAppVersionCode] = useState(2);
-  const [appApkUrl, setAppApkUrl] = useState('https://prashnasarathi.vercel.app/downloads/prashnasarathi-app.apk');
-  const [appChangelog, setAppChangelog] = useState('');
-  const [appForceUpdate, setAppForceUpdate] = useState(false);
-  const [updatingApp, setUpdatingApp] = useState(false);
-
   const handleSendEmailBroadcast = async (e) => {
     e.preventDefault();
     if (!emailSubject.trim() || !emailBody.trim()) {
@@ -102,47 +93,6 @@ export default function AdminPage() {
       toast.error(err.message || 'Failed to enqueue email broadcast');
     } finally {
       setSendingEmail(false);
-    }
-  };
-
-  const fetchCurrentAppVersion = async () => {
-    try {
-      const response = await fetch(`${api.baseUrl}/app-version`);
-      if (response.ok) {
-        const data = await response.json();
-        setAppVersion(String(data.latestVersion || '1.1.0'));
-        setAppVersionCode(data.latestVersionCode || 2);
-        setAppApkUrl(String(data.apkUrl || 'https://prashnasarathi.vercel.app/downloads/prashnasarathi-app.apk'));
-        setAppChangelog(String(data.changelog || ''));
-        setAppForceUpdate(!!data.forceUpdate);
-      }
-    } catch (err) {
-      console.error('Failed to fetch current version settings:', err);
-    }
-  };
-
-  const handleUpdateAppVersion = async (e) => {
-    e.preventDefault();
-    const ver = String(appVersion || '').trim();
-    const url = String(appApkUrl || '').trim();
-    if (!ver || !url) {
-      toast.error('Please enter a version and download URL');
-      return;
-    }
-    setUpdatingApp(true);
-    try {
-      const res = await api.post('/admin/app-version', {
-        latestVersion: appVersion,
-        latestVersionCode: parseInt(appVersionCode),
-        apkUrl: appApkUrl,
-        changelog: appChangelog,
-        forceUpdate: appForceUpdate
-      });
-      toast.success(res.message || 'App version updated and live update broadcasted!');
-    } catch (err) {
-      toast.error(err.message || 'Failed to update app version');
-    } finally {
-      setUpdatingApp(false);
     }
   };
 
@@ -171,23 +121,17 @@ export default function AdminPage() {
         } else if (tab === 'users') {
           await fetchUsers();
         } else if (tab === 'flagged') {
-          await fetchFlagged();
-        } else if (tab === 'anomalies') {
-          await fetchAnomalies();
+          await Promise.all([fetchFlagged(), fetchReportedPosts()]);
         } else if (tab === 'moderationQueue') {
           await fetchModerationQueue();
-        } else if (tab === 'reportedPosts') {
-          await fetchReportedPosts();
         } else if (tab === 'auditLogs') {
           await fetchAuditLogs();
         } else if (tab === 'escalations') {
-          await fetchEscalatedQs();
+          await Promise.all([fetchEscalatedQs(), fetchAnomalies()]);
         } else if (tab === 'siteReports' && user.role === 'admin') {
           await fetchSiteReports();
         } else if (tab === 'emails' && user.role === 'admin') {
           await Promise.all([fetchEmails(), fetchBounces()]);
-        } else if (tab === 'appUpdates' && user.role === 'admin') {
-          await fetchCurrentAppVersion();
         } else if (tab === 'spurti' && user.role === 'admin') {
           await fetchSpurtiLogs(spurtiPage, spurtiSearch);
         }
@@ -212,16 +156,14 @@ export default function AdminPage() {
         fetchUsers();
       } else if (tab === 'flagged') {
         fetchFlagged();
-      } else if (tab === 'anomalies') {
-        fetchAnomalies();
+        fetchReportedPosts();
       } else if (tab === 'moderationQueue') {
         fetchModerationQueue();
-      } else if (tab === 'reportedPosts') {
-        fetchReportedPosts();
       } else if (tab === 'auditLogs') {
         fetchAuditLogs();
       } else if (tab === 'escalations') {
         fetchEscalatedQs();
+        fetchAnomalies();
       } else if (tab === 'emails' && user?.role === 'admin') {
         fetchEmails();
         fetchBounces();
@@ -318,27 +260,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleRunRepair = async () => {
-    if (!confirm('Run data repair? This will fix SP logs, spurtiPoints, and answerCount for ALL users.')) return;
-    setRepairRunning(true);
-    try {
-      const res = await api.post('/admin/repair-data');
-      const r = res.results || {};
-      toast.success(
-        `Repair done! Retro SP logs: ${r.retroLogs}, Base credits: ${r.baseCredited}, ` +
-        `SP resynced: ${r.spResynced}, answerCount fixed: ${r.answerCountSynced}`
-      );
-      // Refresh dashboard stats
-      if (tab === 'dashboard') {
-        fetchDashboard();
-        fetchDeepData();
-      }
-    } catch (err) {
-      toast.error(err.message || 'Repair failed');
-    } finally {
-      setRepairRunning(false);
-    }
-  };
+
 
   const handleRemoveBounce = async (id) => {
     try {
@@ -540,12 +462,12 @@ export default function AdminPage() {
     }
   };
 
-  const tabs = ['dashboard', 'users', 'flagged', 'anomalies'];
+  const tabs = ['dashboard', 'users', 'flagged'];
   if (user?.role === 'admin' || user?.role === 'moderator') {
-    tabs.push('moderationQueue', 'reportedPosts', 'auditLogs', 'escalations');
+    tabs.push('moderationQueue', 'auditLogs', 'escalations');
   }
   if (user?.role === 'admin') {
-    tabs.push('siteReports', 'emails', 'broadcast', 'broadcastEmail', 'appUpdates', 'spurti');
+    tabs.push('siteReports', 'emails', 'broadcast', 'broadcastEmail', 'spurti');
   }
   if (user?.role !== 'admin') {
     const uIdx = tabs.indexOf('users');
@@ -580,14 +502,13 @@ export default function AdminPage() {
             }`}
           >
             {t === 'moderationQueue' ? 'Moderation Queue' :
-             t === 'reportedPosts' ? 'Reported Content' :
+             t === 'flagged' ? 'Flagged & Reported Content' :
              t === 'auditLogs' ? 'Audit Logs' :
              t === 'siteReports' ? 'Site Reports' :
              t === 'emails' ? 'Email Queue' :
              t === 'broadcast' ? 'Broadcast Alerts' :
              t === 'broadcastEmail' ? 'Broadcast Email' :
-             t === 'appUpdates' ? 'App Updates' :
-             t === 'escalations' ? 'Escalations' :
+             t === 'escalations' ? 'Anomalies & Escalations' :
              t === 'spurti' ? 'Spurti Points Tracker' :
              t.charAt(0).toUpperCase() + t.slice(1)}
           </button>
@@ -616,22 +537,7 @@ export default function AdminPage() {
               </div>
             ))}
           </div>
-          {/* Data Repair Banner — admin only */}
-          {user?.role === 'admin' && (
-            <div className="flex items-center gap-3 mb-6 p-4 bg-amber-500/5 border border-amber-500/20 rounded-xl">
-              <div className="flex-1">
-                <p className="text-sm font-bold text-[var(--color-text)]">🔧 Data Integrity Repair</p>
-                <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">Backfills SP logs for old accepted answers, ensures base 10 Sp for all users, resyncs spurtiPoints and answerCount. Run once after deployment.</p>
-              </div>
-              <button
-                onClick={handleRunRepair}
-                disabled={repairRunning}
-                className="px-4 py-2 text-xs font-bold rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/20 transition-all disabled:opacity-50 cursor-pointer shrink-0"
-              >
-                {repairRunning ? 'Running...' : 'Run Repair'}
-              </button>
-            </div>
-          )}
+
           {deepStats && (
             <div className="mt-8 border-t border-[var(--color-border)] pt-8">
               <h2 className="text-xl font-bold text-[var(--color-text)] mb-6">Platform Insights</h2>
@@ -675,7 +581,7 @@ export default function AdminPage() {
       ) : tab === 'users' ? (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
                   <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">User</th>
@@ -774,251 +680,142 @@ export default function AdminPage() {
         </div>
       ) : tab === 'flagged' ? (
         <div className="space-y-6">
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--color-text)] mb-3">Flagged Questions ({flaggedQs.length})</h3>
-            {flaggedQs.length === 0 ? (
-              <div className="card p-4 text-sm text-[var(--color-text-secondary)]">No flagged questions</div>
-            ) : (
-              <div className="space-y-2">
-                {flaggedQs.map(q => (
-                  <div key={q._id} className="card p-4">
-                    <p className="font-medium text-[var(--color-text)]">{q.title}</p>
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">Reason: {q.flagReason}</p>
-                    <p className="text-xs text-[var(--color-text-secondary)] mt-1">Flagged by: {q.flaggedBy?.username}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-          <div>
-            <h3 className="text-lg font-semibold text-[var(--color-text)] mb-3">Flagged Answers ({flaggedAs.length})</h3>
-            {flaggedAs.length === 0 ? (
-              <div className="card p-4 text-sm text-[var(--color-text-secondary)]">No flagged answers</div>
-            ) : (
-              <div className="space-y-2">
-                {flaggedAs.map(a => (
-                  <div key={a._id} className="card p-4">
-                    <p className="text-sm text-[var(--color-text-secondary)] line-clamp-2">{a.body}</p>
-                    <p className="text-xs text-red-600 dark:text-red-400 mt-1">Reason: {a.flagReason}</p>
-                    <p className="text-xs text-[var(--color-text-secondary)] mt-1">Flagged by: {a.flaggedBy?.username}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      ) : tab === 'anomalies' ? (
-        <div className="space-y-6">
-          {/* Live Alerts Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="card p-4 border-l-4 border-red-500 bg-red-500/5">
-              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Open HIGH Alerts</p>
-              <p className="text-3xl font-extrabold text-red-600 dark:text-red-400 mt-1">{anomalyStats?.openHighCount || 0}</p>
-            </div>
-            <div className="card p-4 border-l-4 border-amber-500 bg-amber-500/5">
-              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Open MEDIUM Alerts</p>
-              <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">{anomalyStats?.openMediumCount || 0}</p>
-            </div>
-            <div className="card p-4 border-l-4 border-blue-500 bg-blue-500/5">
-              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Total Active Anomalies</p>
-              <p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">
-                {(anomalyStats?.openHighCount || 0) + (anomalyStats?.openMediumCount || 0)}
+          <div className="card overflow-hidden">
+            <div className="p-5 border-b border-[var(--color-border)] bg-gradient-to-r from-red-500/5 to-orange-500/5">
+              <h3 className="font-bold text-lg text-[var(--color-text)]">Community Reports ({reportedPosts.length})</h3>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                Review posts flagged by the community. Apply restrictions or dismiss reports.
               </p>
             </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Average Resolution Time */}
-            <div className="card p-6">
-              <h4 className="font-semibold text-lg mb-4 text-[var(--color-text)]">Average Resolution Time</h4>
-              <div className="grid grid-cols-3 gap-4 text-center mt-6">
-                <div>
-                  <p className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider font-bold">HIGH Severity</p>
-                  <p className="text-3xl font-extrabold text-red-600 dark:text-red-400 mt-2">
-                    {anomalyStats?.avgResolutionTimes?.high !== undefined ? `${anomalyStats.avgResolutionTimes.high}m` : '0m'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider font-bold">MEDIUM Severity</p>
-                  <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-2">
-                    {anomalyStats?.avgResolutionTimes?.medium !== undefined ? `${anomalyStats.avgResolutionTimes.medium}m` : '0m'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider font-bold">LOW Severity</p>
-                  <p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-2">
-                    {anomalyStats?.avgResolutionTimes?.low !== undefined ? `${anomalyStats.avgResolutionTimes.low}m` : '0m'}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Weekly Trend Chart */}
-            <div className="card p-6">
-              <h4 className="font-semibold text-lg mb-2 text-[var(--color-text)]">Weekly Anomaly Trend (Last 4 Weeks)</h4>
-              <div className="flex items-end justify-between h-36 pt-4 px-2 border-b border-l border-[var(--color-border)]">
-                {anomalyStats?.trend && anomalyStats.trend.length > 0 ? (
-                  anomalyStats.trend.map((t, idx) => {
-                    const maxVal = Math.max(...anomalyStats.trend.map(item => item.count), 1);
-                    const percent = (t.count / maxVal) * 80 + 10;
-                    return (
-                      <div key={idx} className="flex flex-col items-center flex-1 group">
-                        <div className="text-xs font-semibold text-[var(--color-text)] mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          {t.count}
-                        </div>
-                        <div 
-                          style={{ height: `${percent}%` }}
-                          className="w-8 sm:w-10 bg-gradient-to-t from-[var(--color-primary)] to-purple-500 rounded-t-lg shadow-md hover:from-purple-500 hover:to-[var(--color-primary)] transition-all duration-300"
-                        />
-                        <div className="text-[10px] text-[var(--color-text-secondary)] mt-2 font-medium">
-                          Week {t.week.split('-')[1] || t.week}
-                        </div>
-                      </div>
-                    );
-                  })
-                ) : (
-                  <div className="w-full flex items-center justify-center text-sm text-[var(--color-text-muted)] h-full">
-                    No trend data available for the last 30 days
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Filters & Table */}
-          <div className="space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-4">
-              <h3 className="text-lg font-semibold text-[var(--color-text)]">Anomalies Moderation Queue</h3>
-              <div className="flex flex-wrap items-center gap-2">
-                <select
-                  value={anomalySeverityFilter}
-                  onChange={(e) => { setAnomalySeverityFilter(e.target.value); setAnomalyPage(1); }}
-                  className="border border-[var(--color-border)] rounded-xl px-3 py-1.5 bg-[var(--color-bg-secondary)] text-[var(--color-text)] text-xs"
-                >
-                  <option value="all">All Severities</option>
-                  <option value="high">High Only</option>
-                  <option value="medium">Medium Only</option>
-                  <option value="low">Low Only</option>
-                </select>
-
-                <select
-                  value={anomalyStatusFilter}
-                  onChange={(e) => { setAnomalyStatusFilter(e.target.value); setAnomalyPage(1); }}
-                  className="border border-[var(--color-border)] rounded-xl px-3 py-1.5 bg-[var(--color-bg-secondary)] text-[var(--color-text)] text-xs"
-                >
-                  <option value="all">All Statuses</option>
-                  <option value="unresolved">Unresolved Only</option>
-                  <option value="resolved">Resolved Only</option>
-                </select>
-
-                <select
-                  value={anomalySortBy}
-                  onChange={(e) => { setAnomalySortBy(e.target.value); setAnomalyPage(1); }}
-                  className="border border-[var(--color-border)] rounded-xl px-3 py-1.5 bg-[var(--color-bg-secondary)] text-[var(--color-text)] text-xs"
-                >
-                  <option value="time">Sort by Time (Newest)</option>
-                  <option value="severity">Sort by Severity (Score)</option>
-                </select>
-              </div>
-            </div>
-
-            <div className="card overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
-                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Severity</th>
-                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">User</th>
-                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Query Preview</th>
-                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Time Elapsed</th>
-                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Status</th>
-                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Actions</th>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left min-w-[900px]">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Post Type</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Post Preview</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Author</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Reason</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Flagged By</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Date</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)] text-right">Moderator Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border)]">
+                  {reportedPosts.length === 0 ? (
+                    <tr>
+                      <td colSpan="7" className="text-center p-8 text-[var(--color-text-secondary)]">
+                        No reported content in database.
+                      </td>
                     </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[var(--color-border)]">
-                    {anomalies.length === 0 ? (
-                      <tr>
-                        <td colSpan="6" className="text-center py-8 text-[var(--color-text-secondary)]">
-                          No anomalies found matching the criteria.
-                        </td>
-                      </tr>
-                    ) : (
-                      anomalies.map(a => {
-                        const timeElapsed = Math.round((new Date() - new Date(a.createdAt)) / (1000 * 60));
-                        const displayTime = timeElapsed < 60 ? `${timeElapsed}m ago` : `${Math.round(timeElapsed / 60)}h ago`;
-                        
-                        return (
-                          <tr key={a._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                            <td className="px-4 py-3">
-                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${
-                                a.anomalySeverity === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
-                                a.anomalySeverity === 'medium' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
-                                'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-                              }`}>
-                                {a.anomalySeverity} ({a.anomalyScore})
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div>
-                                <p className="font-medium text-[var(--color-text)]">{a.author?.displayName || a.author?.username || 'Anonymous'}</p>
-                                <p className="text-xs text-[var(--color-text-secondary)]">{a.author?.email}</p>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3 max-w-xs">
-                              <a href={`/questions/${a._id}`} className="font-semibold text-primary-600 hover:underline block truncate">
-                                {a.title}
-                              </a>
-                              <p className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">{a.body}</p>
-                            </td>
-                            <td className="px-4 py-3 text-[var(--color-text-secondary)] text-xs">
-                              {displayTime}
-                            </td>
-                            <td className="px-4 py-3">
-                              {a.anomalyResolvedAt ? (
-                                <div className="text-xs">
-                                  <span className="badge-green">Resolved</span>
-                                  <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">by @{a.anomalyResolvedBy?.username}</p>
-                                </div>
+                  ) : (
+                    reportedPosts.map(rep => {
+                      const postAuthor = rep.postId?.author;
+                      return (
+                        <tr key={rep._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                          <td className="px-4 py-3">
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                              rep.postType === 'Question' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
+                            }`}>
+                              {rep.postType}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 max-w-xs truncate" title={rep.postId?.title || rep.postId?.body}>
+                            {rep.postId ? (
+                              rep.postType === 'Question' ? (
+                                <a href={`/questions/${rep.postId._id}`} target="_blank" className="font-semibold hover:underline text-[var(--color-text)]">
+                                  {rep.postId.title}
+                                </a>
                               ) : (
-                                <span className="badge-red">Unresolved</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              {!a.anomalyResolvedAt && (
-                                <button
-                                  onClick={() => handleResolveAnomaly(a._id)}
-                                  className="btn-primary btn-sm px-3 py-1 text-xs"
-                                >
-                                  Mark Resolved
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-              {anomalyPagination.pages > 1 && (
-                <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)]">
-                  <button
-                    onClick={() => setAnomalyPage(p => Math.max(1, p - 1))}
-                    disabled={anomalyPage === 1}
-                    className="btn-secondary btn-sm disabled:opacity-50"
-                  >
-                    Previous
-                  </button>
-                  <span className="text-xs text-[var(--color-text-secondary)]">
-                    Page {anomalyPage} of {anomalyPagination.pages}
-                  </span>
-                  <button
-                    onClick={() => setAnomalyPage(p => Math.min(anomalyPagination.pages, p + 1))}
-                    disabled={anomalyPage === anomalyPagination.pages}
-                    className="btn-secondary btn-sm disabled:opacity-50"
-                  >
-                    Next
-                  </button>
+                                <span className="text-[var(--color-text-secondary)] italic">{rep.postId.body}</span>
+                              )
+                            ) : (
+                              <span className="text-red-500 italic">Deleted / Missing Post</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            {postAuthor ? (
+                              <div>
+                                <p className="font-medium text-[var(--color-text)]">@{postAuthor.username}</p>
+                                <p className="text-[10px] text-[var(--color-text-secondary)]">Score: {postAuthor.trustScore ?? 0} ({postAuthor.trustLevel || 'new'})</p>
+                              </div>
+                            ) : (
+                              <span className="text-[var(--color-text-muted)]">N/A</span>
+                            )}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="capitalize font-semibold text-red-600 dark:text-red-400 text-xs bg-red-100/30 px-2 py-0.5 rounded">
+                              {rep.reason}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-[var(--color-text-secondary)]">@{rep.reportedBy?.username}</td>
+                          <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">{formatDate(rep.createdAt)}</td>
+                          <td className="px-4 py-3 text-right">
+                            {postAuthor && (
+                              postAuthor._id === user?.id || postAuthor._id === user?._id || postAuthor.email === 'faqportal.in@gmail.com' ? (
+                                <span className="text-[10px] text-[var(--color-text-muted)] italic">System Account</span>
+                              ) : (
+                                <div className="inline-flex gap-1.5">
+                                  <button
+                                    onClick={() => handleUserAction(postAuthor._id, 'warn')}
+                                    className="px-2 py-1 text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white rounded"
+                                  >
+                                    Warn
+                                  </button>
+                                  <button
+                                    onClick={() => handleUserAction(postAuthor._id, 'suspend')}
+                                    className="px-2 py-1 text-[10px] font-bold bg-orange-500 hover:bg-orange-600 text-white rounded"
+                                  >
+                                    Suspend
+                                  </button>
+                                  <button
+                                    onClick={() => handleUserAction(postAuthor._id, 'block')}
+                                    className="px-2 py-1 text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white rounded"
+                                  >
+                                    Block
+                                  </button>
+                                </div>
+                              )
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--color-text)] mb-3">Flagged Questions ({flaggedQs.length})</h3>
+              {flaggedQs.length === 0 ? (
+                <div className="card p-4 text-sm text-[var(--color-text-secondary)]">No flagged questions</div>
+              ) : (
+                <div className="space-y-2">
+                  {flaggedQs.map(q => (
+                    <div key={q._id} className="card p-4">
+                      <p className="font-medium text-[var(--color-text)]">{q.title}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">Reason: {q.flagReason}</p>
+                      <p className="text-xs text-[var(--color-text-secondary)] mt-1">Flagged by: {q.flaggedBy?.username}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-[var(--color-text)] mb-3">Flagged Answers ({flaggedAs.length})</h3>
+              {flaggedAs.length === 0 ? (
+                <div className="card p-4 text-sm text-[var(--color-text-secondary)]">No flagged answers</div>
+              ) : (
+                <div className="space-y-2">
+                  {flaggedAs.map(a => (
+                    <div key={a._id} className="card p-4">
+                      <p className="text-sm text-[var(--color-text-secondary)] line-clamp-2">{a.body}</p>
+                      <p className="text-xs text-red-600 dark:text-red-400 mt-1">Reason: {a.flagReason}</p>
+                      <p className="text-xs text-[var(--color-text-secondary)] mt-1">Flagged by: {a.flaggedBy?.username}</p>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
@@ -1036,7 +833,7 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left min-w-[900px]">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
                   <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Status</th>
@@ -1209,112 +1006,6 @@ export default function AdminPage() {
             )}
           </div>
         </div>
-      ) : tab === 'reportedPosts' ? (
-        <div className="card overflow-hidden">
-          <div className="p-5 border-b border-[var(--color-border)] bg-gradient-to-r from-red-500/5 to-orange-500/5">
-            <h3 className="font-bold text-lg text-[var(--color-text)]">Community Reports ({reportedPosts.length})</h3>
-            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-              Review posts flagged by the community. Apply restrictions or dismiss reports.
-            </p>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Post Type</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Post Preview</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Author</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Reason</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Flagged By</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Date</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)] text-right">Moderator Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
-                {reportedPosts.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="text-center p-8 text-[var(--color-text-secondary)]">
-                      No reported content in database.
-                    </td>
-                  </tr>
-                ) : (
-                  reportedPosts.map(rep => {
-                    const postAuthor = rep.postId?.author;
-                    return (
-                      <tr key={rep._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                            rep.postType === 'Question' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400'
-                          }`}>
-                            {rep.postType}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 max-w-xs truncate" title={rep.postId?.title || rep.postId?.body}>
-                          {rep.postId ? (
-                            rep.postType === 'Question' ? (
-                              <a href={`/questions/${rep.postId._id}`} target="_blank" className="font-semibold hover:underline text-[var(--color-text)]">
-                                {rep.postId.title}
-                              </a>
-                            ) : (
-                              <span className="text-[var(--color-text-secondary)] italic">{rep.postId.body}</span>
-                            )
-                          ) : (
-                            <span className="text-red-500 italic">Deleted / Missing Post</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          {postAuthor ? (
-                            <div>
-                              <p className="font-medium text-[var(--color-text)]">@{postAuthor.username}</p>
-                              <p className="text-[10px] text-[var(--color-text-secondary)]">Score: {postAuthor.trustScore ?? 0} ({postAuthor.trustLevel || 'new'})</p>
-                            </div>
-                          ) : (
-                            <span className="text-[var(--color-text-muted)]">N/A</span>
-                          )}
-                        </td>
-                        <td className="px-4 py-3">
-                          <span className="capitalize font-semibold text-red-600 dark:text-red-400 text-xs bg-red-100/30 px-2 py-0.5 rounded">
-                            {rep.reason}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-[var(--color-text-secondary)]">@{rep.reportedBy?.username}</td>
-                        <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">{formatDate(rep.createdAt)}</td>
-                        <td className="px-4 py-3 text-right">
-                          {postAuthor && (
-                            postAuthor._id === user?.id || postAuthor._id === user?._id || postAuthor.email === 'faqportal.in@gmail.com' ? (
-                              <span className="text-[10px] text-[var(--color-text-muted)] italic">System Account</span>
-                            ) : (
-                              <div className="inline-flex gap-1.5">
-                                <button
-                                  onClick={() => handleUserAction(postAuthor._id, 'warn')}
-                                  className="px-2 py-1 text-[10px] font-bold bg-amber-500 hover:bg-amber-600 text-white rounded"
-                                >
-                                  Warn
-                                </button>
-                                <button
-                                  onClick={() => handleUserAction(postAuthor._id, 'suspend')}
-                                  className="px-2 py-1 text-[10px] font-bold bg-orange-500 hover:bg-orange-600 text-white rounded"
-                                >
-                                  Suspend
-                                </button>
-                                <button
-                                  onClick={() => handleUserAction(postAuthor._id, 'block')}
-                                  className="px-2 py-1 text-[10px] font-bold bg-red-600 hover:bg-red-700 text-white rounded"
-                                >
-                                  Block
-                                </button>
-                              </div>
-                            )
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
       ) : tab === 'auditLogs' ? (
         <div className="card overflow-hidden">
           <div className="p-5 border-b border-[var(--color-border)] bg-gray-50 dark:bg-gray-800/20">
@@ -1324,7 +1015,7 @@ export default function AdminPage() {
             </p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
+            <table className="w-full text-sm text-left min-w-[800px]">
               <thead>
                 <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
                   <th className="px-4 py-3 font-semibold text-[var(--color-text)]">User/Admin</th>
@@ -1359,92 +1050,310 @@ export default function AdminPage() {
           </div>
         </div>
       ) : tab === 'escalations' ? (
-        <div className="card overflow-hidden border border-[var(--color-border)] rounded-2xl shadow-xl bg-[var(--color-bg-secondary)] relative">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500" />
-          <div className="p-5 border-b border-[var(--color-border)] bg-gray-50 dark:bg-gray-800/20">
-            <h3 className="font-bold text-lg text-[var(--color-text)] flex items-center gap-2">
-              <span>⚠️</span> Escalated Queries ({escalatedQs.length})
-            </h3>
-            <p className="text-xs text-[var(--color-text-secondary)] mt-1">
-              Persistent list of escalated queries that require administrative or moderator review and resolution.
-            </p>
+        <div className="space-y-8">
+          {/* Anomalies Stats & Trend Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="card p-4 border-l-4 border-red-500 bg-red-500/5">
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Open HIGH Alerts</p>
+              <p className="text-3xl font-extrabold text-red-600 dark:text-red-400 mt-1">{anomalyStats?.openHighCount || 0}</p>
+            </div>
+            <div className="card p-4 border-l-4 border-amber-500 bg-amber-500/5">
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Open MEDIUM Alerts</p>
+              <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-1">{anomalyStats?.openMediumCount || 0}</p>
+            </div>
+            <div className="card p-4 border-l-4 border-blue-500 bg-blue-500/5">
+              <p className="text-sm font-semibold text-[var(--color-text-secondary)]">Total Active Anomalies</p>
+              <p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-1">
+                {(anomalyStats?.openHighCount || 0) + (anomalyStats?.openMediumCount || 0)}
+              </p>
+            </div>
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm text-left">
-              <thead>
-                <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Question Details</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Author</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Escalation Reason</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Date Escalated</th>
-                  <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[var(--color-border)]">
-                {escalatedQs.length === 0 ? (
-                  <tr>
-                    <td colSpan="5" className="text-center p-8 text-[var(--color-text-secondary)]">
-                      No escalated queries found.
-                    </td>
-                  </tr>
-                ) : (
-                  escalatedQs.map(q => (
-                    <tr key={q._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
-                      <td className="px-4 py-3">
-                        <a href={`/questions/${q._id}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary-600 hover:text-primary-700 hover:underline">
-                          {q.title}
-                        </a>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
-                          <span className="badge-gray text-[10px]">{q.answerCount || 0} answers</span>
-                          {q.tagNames?.map(tag => (
-                            <span key={tag} className="badge-primary text-[10px]">{tag}</span>
-                          ))}
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Average Resolution Time */}
+            <div className="card p-6">
+              <h4 className="font-semibold text-lg mb-4 text-[var(--color-text)]">Average Resolution Time</h4>
+              <div className="grid grid-cols-3 gap-4 text-center mt-6">
+                <div>
+                  <p className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider font-bold">HIGH Severity</p>
+                  <p className="text-3xl font-extrabold text-red-600 dark:text-red-400 mt-2">
+                    {anomalyStats?.avgResolutionTimes?.high !== undefined ? `${anomalyStats.avgResolutionTimes.high}m` : '0m'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider font-bold">MEDIUM Severity</p>
+                  <p className="text-3xl font-extrabold text-amber-600 dark:text-amber-400 mt-2">
+                    {anomalyStats?.avgResolutionTimes?.medium !== undefined ? `${anomalyStats.avgResolutionTimes.medium}m` : '0m'}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-[var(--color-text-secondary)] uppercase tracking-wider font-bold">LOW Severity</p>
+                  <p className="text-3xl font-extrabold text-blue-600 dark:text-blue-400 mt-2">
+                    {anomalyStats?.avgResolutionTimes?.low !== undefined ? `${anomalyStats.avgResolutionTimes.low}m` : '0m'}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Weekly Trend Chart */}
+            <div className="card p-6">
+              <h4 className="font-semibold text-lg mb-2 text-[var(--color-text)]">Weekly Anomaly Trend (Last 4 Weeks)</h4>
+              <div className="flex items-end justify-between h-36 pt-4 px-2 border-b border-l border-[var(--color-border)]">
+                {anomalyStats?.trend && anomalyStats.trend.length > 0 ? (
+                  anomalyStats.trend.map((t, idx) => {
+                    const maxVal = Math.max(...anomalyStats.trend.map(item => item.count), 1);
+                    const percent = (t.count / maxVal) * 80 + 10;
+                    return (
+                      <div key={idx} className="flex flex-col items-center flex-1 group">
+                        <div className="text-xs font-semibold text-[var(--color-text)] mb-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {t.count}
                         </div>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-[var(--color-text)] text-xs">
-                        {q.author ? `@${q.author.username || q.author.displayName}` : 'Anonymous'}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)] italic max-w-xs truncate" title={q.escalationReason}>
-                        {q.escalationReason || 'No response within 24 hours'}
-                      </td>
-                      <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">
-                        {formatDate(q.escalatedAt)}
-                      </td>
-                      <td className="px-4 py-3">
-                        <button
-                          onClick={() => handleResolveEscalation(q._id)}
-                          className="btn-warning btn-sm px-3 py-1 text-xs font-semibold rounded-lg shadow-sm"
-                        >
-                          Resolve Escalation
-                        </button>
+                        <div 
+                          style={{ height: `${percent}%` }}
+                          className="w-8 sm:w-10 bg-gradient-to-t from-[var(--color-primary)] to-purple-500 rounded-t-lg shadow-md hover:from-purple-500 hover:to-[var(--color-primary)] transition-all duration-300"
+                        />
+                        <div className="text-[10px] text-[var(--color-text-secondary)] mt-2 font-medium">
+                          Week {t.week.split('-')[1] || t.week}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="w-full flex items-center justify-center text-sm text-[var(--color-text-muted)] h-full">
+                    No trend data available for the last 30 days
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Escalated Queries Section */}
+          <div className="card overflow-hidden border border-[var(--color-border)] rounded-2xl shadow-xl bg-[var(--color-bg-secondary)] relative">
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-orange-400 via-red-500 to-pink-500" />
+            <div className="p-5 border-b border-[var(--color-border)] bg-gray-50 dark:bg-gray-800/20">
+              <h3 className="font-bold text-lg text-[var(--color-text)] flex items-center gap-2">
+                <span>⚠️</span> Escalated Queries ({escalatedQs.length})
+              </h3>
+              <p className="text-xs text-[var(--color-text-secondary)] mt-1">
+                Persistent list of escalated queries that require administrative or moderator review and resolution.
+              </p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left min-w-[800px]">
+                <thead>
+                  <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Question Details</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Author</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Escalation Reason</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Date Escalated</th>
+                    <th className="px-4 py-3 font-semibold text-[var(--color-text)]">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[var(--color-border)]">
+                  {escalatedQs.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" className="text-center p-8 text-[var(--color-text-secondary)]">
+                        No escalated queries found.
                       </td>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
-          {escalatedPagination.pages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)]">
-              <button
-                onClick={() => setEscalatedPage(p => Math.max(1, p - 1))}
-                disabled={escalatedPage === 1}
-                className="btn-secondary btn-sm disabled:opacity-50 text-xs px-2.5 py-1"
-              >
-                Previous
-              </button>
-              <span className="text-xs text-[var(--color-text-secondary)]">
-                Page {escalatedPage} of {escalatedPagination.pages}
-              </span>
-              <button
-                onClick={() => setEscalatedPage(p => Math.min(escalatedPagination.pages, p + 1))}
-                disabled={escalatedPage === escalatedPagination.pages}
-                className="btn-secondary btn-sm disabled:opacity-50 text-xs px-2.5 py-1"
-              >
-                Next
-              </button>
+                  ) : (
+                    escalatedQs.map(q => (
+                      <tr key={q._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                        <td className="px-4 py-3">
+                          <a href={`/questions/${q._id}`} target="_blank" rel="noopener noreferrer" className="font-semibold text-primary-600 hover:text-primary-700 hover:underline">
+                            {q.title}
+                          </a>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                            <span className="badge-gray text-[10px]">{q.answerCount || 0} answers</span>
+                            {q.tagNames?.map(tag => (
+                              <span key={tag} className="badge-primary text-[10px]">{tag}</span>
+                            ))}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 font-medium text-[var(--color-text)] text-xs">
+                          {q.author ? `@${q.author.username || q.author.displayName}` : 'Anonymous'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)] italic max-w-xs truncate" title={q.escalationReason}>
+                          {q.escalationReason || 'No response within 24 hours'}
+                        </td>
+                        <td className="px-4 py-3 text-xs text-[var(--color-text-secondary)]">
+                          {formatDate(q.escalatedAt)}
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleResolveEscalation(q._id)}
+                            className="btn-warning btn-sm px-3 py-1 text-xs font-semibold rounded-lg shadow-sm"
+                          >
+                            Resolve Escalation
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
+            {escalatedPagination.pages > 1 && (
+              <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)]">
+                <button
+                  onClick={() => setEscalatedPage(p => Math.max(1, p - 1))}
+                  disabled={escalatedPage === 1}
+                  className="btn-secondary btn-sm disabled:opacity-50 text-xs px-2.5 py-1"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-[var(--color-text-secondary)]">
+                  Page {escalatedPage} of {escalatedPagination.pages}
+                </span>
+                <button
+                  onClick={() => setEscalatedPage(p => Math.min(escalatedPagination.pages, p + 1))}
+                  disabled={escalatedPage === escalatedPagination.pages}
+                  className="btn-secondary btn-sm disabled:opacity-50 text-xs px-2.5 py-1"
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Anomalies Moderation Queue Section */}
+          <div className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-4">
+              <h3 className="text-lg font-semibold text-[var(--color-text)]">Anomalies Moderation Queue</h3>
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={anomalySeverityFilter}
+                  onChange={(e) => { setAnomalySeverityFilter(e.target.value); setAnomalyPage(1); }}
+                  className="border border-[var(--color-border)] rounded-xl px-3 py-1.5 bg-[var(--color-bg-secondary)] text-[var(--color-text)] text-xs"
+                >
+                  <option value="all">All Severities</option>
+                  <option value="high">High Only</option>
+                  <option value="medium">Medium Only</option>
+                  <option value="low">Low Only</option>
+                </select>
+
+                <select
+                  value={anomalyStatusFilter}
+                  onChange={(e) => { setAnomalyStatusFilter(e.target.value); setAnomalyPage(1); }}
+                  className="border border-[var(--color-border)] rounded-xl px-3 py-1.5 bg-[var(--color-bg-secondary)] text-[var(--color-text)] text-xs"
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="unresolved">Unresolved Only</option>
+                  <option value="resolved">Resolved Only</option>
+                </select>
+
+                <select
+                  value={anomalySortBy}
+                  onChange={(e) => { setAnomalySortBy(e.target.value); setAnomalyPage(1); }}
+                  className="border border-[var(--color-border)] rounded-xl px-3 py-1.5 bg-[var(--color-bg-secondary)] text-[var(--color-text)] text-xs"
+                >
+                  <option value="time">Sort by Time (Newest)</option>
+                  <option value="severity">Sort by Severity (Score)</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="card overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm min-w-[800px]">
+                  <thead>
+                    <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
+                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Severity</th>
+                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">User</th>
+                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Query Preview</th>
+                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Time Elapsed</th>
+                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Status</th>
+                      <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-[var(--color-border)]">
+                    {anomalies.length === 0 ? (
+                      <tr>
+                        <td colSpan="6" className="text-center py-8 text-[var(--color-text-secondary)]">
+                          No anomalies found matching the criteria.
+                        </td>
+                      </tr>
+                    ) : (
+                      anomalies.map(a => {
+                        const timeElapsed = Math.round((new Date() - new Date(a.createdAt)) / (1000 * 60));
+                        const displayTime = timeElapsed < 60 ? `${timeElapsed}m ago` : `${Math.round(timeElapsed / 60)}h ago`;
+                        
+                        return (
+                          <tr key={a._id} className="hover:bg-gray-50 dark:hover:bg-gray-800/30">
+                            <td className="px-4 py-3">
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold uppercase ${
+                                a.anomalySeverity === 'high' ? 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400' :
+                                a.anomalySeverity === 'medium' ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400' :
+                                'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
+                              }`}>
+                                {a.anomalySeverity} ({a.anomalyScore})
+                              </span>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div>
+                                <p className="font-medium text-[var(--color-text)]">{a.author?.displayName || a.author?.username || 'Anonymous'}</p>
+                                <p className="text-xs text-[var(--color-text-secondary)]">{a.author?.email}</p>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 max-w-xs">
+                              <a href={`/questions/${a._id}`} className="font-semibold text-primary-600 hover:underline block truncate">
+                                {a.title}
+                              </a>
+                              <p className="text-xs text-[var(--color-text-secondary)] truncate mt-0.5">{a.body}</p>
+                            </td>
+                            <td className="px-4 py-3 text-[var(--color-text-secondary)] text-xs">
+                              {displayTime}
+                            </td>
+                            <td className="px-4 py-3">
+                              {a.anomalyResolvedAt ? (
+                                <div className="text-xs">
+                                  <span className="badge-green">Resolved</span>
+                                  <p className="text-[10px] text-[var(--color-text-secondary)] mt-0.5">by @{a.anomalyResolvedBy?.username}</p>
+                                </div>
+                              ) : (
+                                <span className="badge-red">Unresolved</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3">
+                              {!a.anomalyResolvedAt && (
+                                <button
+                                  onClick={() => handleResolveAnomaly(a._id)}
+                                  className="btn-primary btn-sm px-3 py-1 text-xs"
+                                >
+                                  Mark Resolved
+                                </button>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              {anomalyPagination.pages > 1 && (
+                <div className="flex items-center justify-between px-4 py-3 border-t border-[var(--color-border)]">
+                  <button
+                    onClick={() => setAnomalyPage(p => Math.max(1, p - 1))}
+                    disabled={anomalyPage === 1}
+                    className="btn-secondary btn-sm disabled:opacity-50"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-xs text-[var(--color-text-secondary)]">
+                    Page {anomalyPage} of {anomalyPagination.pages}
+                  </span>
+                  <button
+                    onClick={() => setAnomalyPage(p => Math.min(anomalyPagination.pages, p + 1))}
+                    disabled={anomalyPage === anomalyPagination.pages}
+                    className="btn-secondary btn-sm disabled:opacity-50"
+                  >
+                    Next
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       ) : tab === 'emails' ? (
         <div className="space-y-6">
@@ -1507,7 +1416,7 @@ export default function AdminPage() {
                   <h4 className="font-bold text-[var(--color-text)] text-sm">Active Queue Logs</h4>
                 </div>
                 <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left">
+                  <table className="w-full text-sm text-left min-w-[700px]">
                     <thead>
                       <tr className="bg-gray-50 dark:bg-gray-800/50 border-b border-[var(--color-border)]">
                         <th className="px-4 py-2.5 font-semibold text-[var(--color-text)]">To</th>
@@ -1711,95 +1620,6 @@ export default function AdminPage() {
             </button>
           </form>
         </div>
-      ) : tab === 'appUpdates' && user?.role === 'admin' ? (
-        <div className="card p-6 max-w-2xl mx-auto border border-[var(--color-border)] rounded-2xl shadow-xl bg-[var(--color-bg-secondary)] relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-400 via-primary-500 to-indigo-500" />
-          <h2 className="text-xl font-bold text-[var(--color-text)] mb-4 flex items-center gap-2">
-            <span>🚀</span> Publish App Update
-          </h2>
-          <p className="text-sm text-[var(--color-text-secondary)] mb-6 leading-relaxed">
-            Update the target version parameters for hybrid/native wrappers (Capacitor/Tauri). Saving will immediately trigger an in-app prompt or update lockout (if forced) for all active online clients via Socket.IO, and update the download center.
-          </p>
-          <form onSubmit={handleUpdateAppVersion} className="space-y-5">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-[var(--color-text)] mb-2">
-                  Version Name (latestVersion)
-                </label>
-                <input
-                  type="text"
-                  value={appVersion}
-                  onChange={(e) => setAppVersion(e.target.value)}
-                  placeholder="e.g. 1.2.0"
-                  required
-                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-sm text-[var(--color-text)] focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-[var(--color-text)] mb-2">
-                  Version Code (Integer build)
-                </label>
-                <input
-                  type="number"
-                  value={appVersionCode}
-                  onChange={(e) => setAppVersionCode(e.target.value)}
-                  placeholder="e.g. 3"
-                  required
-                  className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-sm text-[var(--color-text)] focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-                />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--color-text)] mb-2">
-                Download APK / Setup Link (apkUrl)
-              </label>
-              <input
-                type="url"
-                value={appApkUrl}
-                onChange={(e) => setAppApkUrl(e.target.value)}
-                placeholder="e.g. https://domain.com/downloads/prashnasarathi-app.apk"
-                required
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-3 text-sm text-[var(--color-text)] focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-[var(--color-text)] mb-2">
-                Changelog / Release Notes
-              </label>
-              <textarea
-                value={appChangelog}
-                onChange={(e) => setAppChangelog(e.target.value)}
-                placeholder="Describe new features, fixes, or security enhancements..."
-                rows={4}
-                className="w-full rounded-xl border border-[var(--color-border)] bg-[var(--color-bg)] p-4 text-sm text-[var(--color-text)] focus:border-primary-500 focus:ring-1 focus:ring-primary-500 transition-colors"
-              />
-            </div>
-            <div className="flex items-center gap-3 p-4 bg-red-500/5 border border-red-500/10 rounded-xl">
-              <input
-                type="checkbox"
-                id="forceUpdate"
-                checked={appForceUpdate}
-                onChange={(e) => setAppForceUpdate(e.target.checked)}
-                className="w-4 h-4 text-red-600 border-[var(--color-border)] rounded focus:ring-red-500 bg-[var(--color-bg)]"
-              />
-              <div>
-                <label htmlFor="forceUpdate" className="text-sm font-bold text-red-600 cursor-pointer select-none">
-                  Force Mandatory Update
-                </label>
-                <p className="text-xs text-[var(--color-text-secondary)] mt-0.5">
-                  Checking this locks out users from accessing the app until they download the latest update.
-                </p>
-              </div>
-            </div>
-            <button
-              type="submit"
-              disabled={updatingApp || !String(appVersion || '').trim() || !String(appApkUrl || '').trim()}
-              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold shadow-md shadow-emerald-600/10 flex items-center justify-center gap-2 disabled:opacity-50 transition-all duration-200 cursor-pointer"
-            >
-              {updatingApp ? 'Publishing Updates...' : 'Publish Update & Broadcast Now'}
-            </button>
-          </form>
-        </div>
       ) : tab === 'spurti' && user.role === 'admin' ? (
         <div className="card p-6">
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
@@ -1832,7 +1652,7 @@ export default function AdminPage() {
           </div>
 
           <div className="overflow-x-auto border border-[var(--color-border)]/50 rounded-xl shadow-sm">
-            <table className="w-full text-sm">
+            <table className="w-full text-sm min-w-[800px]">
               <thead>
                 <tr className="bg-[var(--color-bg-tertiary)]/50 border-b border-[var(--color-border)]">
                   <th className="text-left px-4 py-3 font-medium text-[var(--color-text)]">User</th>
