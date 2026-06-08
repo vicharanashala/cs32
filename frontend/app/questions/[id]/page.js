@@ -719,8 +719,10 @@ export default function QuestionDetailPage() {
             </div>
           ) : (
             <div className="space-y-4 mb-6">
-              {answers.map(answer => (
-                <div key={answer._id} className={`card p-6 ${answer.isAccepted ? 'border-green-300 ring-1 ring-green-200' : ''}`}>
+              {answers.map(answer => {
+                const isAiBot = answer.isOfficial && answer.body && answer.body.includes('PrashnaSarathi AI Bot');
+                return (
+                <div key={answer._id} className={`card p-6 ${answer.isAccepted ? 'border-green-300 ring-1 ring-green-200' : isAiBot ? 'border-purple-500/40 ring-1 ring-purple-400/20' : ''}`}>
                   <div className="flex gap-4">
                     <div className="hidden sm:flex flex-col items-center gap-1">
                       <button onClick={() => handleVote('Answer', answer._id, 'upvote')} className="p-1 rounded hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-400 dark:text-gray-500 hover:text-green-600">
@@ -732,6 +734,19 @@ export default function QuestionDetailPage() {
                       </button>
                     </div>
                     <div className="flex-1">
+                      {/* AI Bot Answer Header */}
+                      {answer.isOfficial && answer.body && answer.body.includes('PrashnaSarathi AI Bot') && (
+                        <div className="mb-3 -mx-2 px-3 py-2.5 bg-gradient-to-r from-purple-900/30 to-indigo-900/20 border border-purple-500/30 rounded-xl flex items-center gap-2.5">
+                          <div className="w-7 h-7 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center shadow-sm shrink-0">
+                            <span className="text-sm">🤖</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-purple-300 leading-none">PrashnaSarathi AI Bot</p>
+                            <p className="text-[10px] text-purple-400/80 mt-0.5 leading-none">AI-generated · Based on official knowledge base</p>
+                          </div>
+                          <span className="shrink-0 text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 border border-purple-500/30 font-medium">Auto Answer</span>
+                        </div>
+                      )}
                       <MarkdownRenderer content={answer.body} />
                       <div className="mt-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
                         <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--color-text-secondary)]">
@@ -815,7 +830,9 @@ export default function QuestionDetailPage() {
                     </div>
                   </div>
                 </div>
-              ))}
+                );
+              })}
+
             </div>
           )}
 

@@ -6,6 +6,7 @@ const { paginate, buildPaginationMeta } = require('../utils/helpers');
 const { getDashboardStats, getUserAnalytics, getGlobalFAQAnalytics } = require('../services/analyticsService');
 const { banUser, unbanUser } = require('../services/moderationService');
 const { getRedis } = require('../config/redis');
+const { triggerAutoAnswer } = require('../services/autoAnswerService');
 
 exports.getDashboard = async (req, res, next) => {
   try {
@@ -556,6 +557,13 @@ exports.approvePost = async (req, res, next) => {
         .populate('tags', 'name color')
         .populate('relatedQuestions', 'title answerCount');
       await indexQuestion(populated);
+
+      // Trigger AI auto-answer for newly-approved question (fire-and-forget)
+      setImmediate(() => {
+        triggerAutoAnswer(populated).catch(err =>
+          console.error('[AutoAnswer] approvePost trigger error:', err.message)
+        );
+      });
 
       // Email notification
       try {

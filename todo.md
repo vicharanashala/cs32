@@ -800,19 +800,28 @@ All code changes have been committed and pushed to `main` on GitHub. Reload the 
 
 #### Latest Fixes (June 9, 2026 — Search & AI Stability)
 
-1. **Search Page Race Condition & Stale Closure Fix**
+1. **Automated Question Assistance (AI Auto-Answers)**
+   * *Problem*: New public or pre-moderation approved questions lacked immediate, grounded guidance from the official FAQ database/knowledge base.
+   * *Resolution*:
+     - Implemented `autoAnswerService.js` with heuristic filtering (spam, gibberish, offensive content) and multi-model Gemini fallbacks.
+     - Automatically retrieves relevant official FAQ pages and Q&A items using keyword/tag intent extraction.
+     - Generates official grounded answers prefixed with the mandatory `PrashnaSarathi AI Bot` header and disclaimer.
+     - Integrated non-blocking background triggers in `createQuestion` (for public visibility) and `approvePost` (moderation queue approval).
+     - Applied premium visual styles to bot-authored responses (purple gradient header, bot icon, and badge) in the frontend.
+
+2. **Search Page Race Condition & Stale Closure Fix**
    * *Root Cause*: React state updates inside stale closures caused queries to overwrite each other. Rapid keystroke queries could overwrite newer results due to race conditions.
    * *Resolution*: Rewrote search query handling to sync directly with URL parameters. Implemented client-side `AbortController` in fetching hooks to immediately cancel pending API calls when new searches are initiated. Added loading spinner feedback inside search inputs.
 
-2. **Service Worker AI API Bypass**
+3. **Service Worker AI API Bypass**
    * *Root Cause*: The service worker intercepted AI endpoints (`/api/search/ai`) and applied a strict 3000ms timeout fallback. Because LLM generation often takes longer than 3000ms, requests aborted prematurely and loaded cached errors or empty templates.
    * *Resolution*: Modified `sw.js` to completely bypass service worker interception and caching for the AI endpoint, allowing AI requests to go directly to the network.
 
-3. **Dynamic PWA Cache Invalidation**
+4. **Dynamic PWA Cache Invalidation**
    * *Root Cause*: Static assets and page JS chunks were cached via a Cache-First strategy under a hardcoded cache version name. Browser clients loaded stale page scripts even after fresh production builds.
    * *Resolution*: Updated `build-sw.js` to automatically replace `CACHE_NAME` and `DATA_CACHE_NAME` with unique timestamps on every build, forcing browser clients to immediately reload the updated code.
 
-4. **Gemini API Model Fallback Chain & Widget Resiliency**
+5. **Gemini API Model Fallback Chain & Widget Resiliency**
    * *Root Cause*: Rate limits (429) or high demand (503) on specific model variants caused service downtime. Floating widget crashed when handling non-200 responses.
    * *Resolution*: Built a robust API fallback chain starting with the stable `gemini-3.1-flash-lite` and cascading through `gemini-2.5-flash`, `gemini-3.5-flash`, and `gemini-2.0-flash`. Updated the frontend widget to query via native `fetch` to gracefully digest structured API errors.
 

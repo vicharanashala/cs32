@@ -123,7 +123,7 @@ prashnasarathi/
 │   ├── models/           # Mongoose schemas (User, Question, Answer, FAQ, etc.)
 │   ├── routes/           # Express route definitions (12 route files)
 │   ├── seeds/            # Database seed scripts
-│   ├── services/         # ES search, recommendations, analytics, push notifications
+│   ├── services/         # ES search, recommendations, analytics, push notifications, auto-answer
 │   ├── socket/           # Socket.IO real-time event setups
 │   ├── uploads/          # Local storage path for uploaded user files
 │   └── utils/            # Helpers, validators, permissions, email templates
