@@ -12,6 +12,8 @@ import { Toaster } from 'react-hot-toast';
 import PwaProvider from '@/pwa/PwaProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import VoiceSearchWrapper from '@/components/VoiceSearchWrapper';
+import ReportIssueButton from '@/components/ReportIssueButton';
+
 
 export const metadata = {
   title: 'PrashnaSārathi - Community Q&A and FAQ Platform',
@@ -53,6 +55,7 @@ export default function RootLayout({ children }) {
                       </main>
                       <Footer />
                       <VoiceSearchWrapper />
+                      <ReportIssueButton />
                     </PwaProvider>
                   </ThemeProvider>
                 </KeyboardProvider>
