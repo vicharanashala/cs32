@@ -52,12 +52,30 @@ export default function SearchModal({ isOpen, onClose }) {
     }
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    recognition.interimResults = false;
+    // Enable interim results to provide live feedback (optional)
+    recognition.interimResults = true;
     recognition.maxAlternatives = 1;
     recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      setQuery(transcript);
-      setListening(false);
+      let interim = '';
+      let final = '';
+      for (let i = 0; i < event.results.length; i++) {
+        const result = event.results[i];
+        const transcript = result[0].transcript;
+        if (result.isFinal) {
+          final += transcript + ' ';
+        } else {
+          interim += transcript;
+        }
+      }
+      // Use final transcript if available, otherwise interim
+      if (final.trim()) {
+        setQuery(final.trim());
+        // Stop listening after final result
+        setListening(false);
+        recognition.stop();
+      } else {
+        setQuery(interim);
+      }
     };
     recognition.onend = () => setListening(false);
     recognition.onerror = (e) => {
