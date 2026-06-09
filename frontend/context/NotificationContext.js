@@ -46,9 +46,16 @@ export function NotificationProvider({ children }) {
       setBrowserPermission(Notification.permission);
     }
 
-    if ('serviceWorker' in navigator) {
+    if (process.env.NODE_ENV !== 'development' && 'serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(err => {
         console.log('Service worker registration failed:', err);
+      });
+    } else if (process.env.NODE_ENV === 'development' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+          registration.unregister();
+          console.log('[PWA] Unregistered service worker in development mode (NotificationContext).');
+        }
       });
     }
   }, []);

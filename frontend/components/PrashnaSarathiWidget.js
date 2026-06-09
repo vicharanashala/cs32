@@ -65,6 +65,20 @@ export default function PrashnaSarathiWidget() {
     setMessages(prev => [...prev, { sender: 'user', text }]);
     setLoading(true);
 
+    const isOffline = typeof window !== 'undefined' && !navigator.onLine;
+    if (isOffline) {
+      setTimeout(() => {
+        setMessages(prev => [...prev, {
+          sender: 'bot',
+          text: 'Namaste! PrashnaSārathi AI Assistant requires an active internet connection and is not available offline. Please check your network connection and try again.',
+          status: 'Offline',
+          source: 'System'
+        }]);
+        setLoading(false);
+      }, 500);
+      return;
+    }
+
     try {
       const currentUrl = typeof window !== 'undefined' ? window.location.href : '';
       const pageTitle = typeof document !== 'undefined' ? document.title : '';

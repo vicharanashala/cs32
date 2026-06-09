@@ -1,5 +1,5 @@
-const CACHE_NAME = 'prashnasarathi-pwa-cache-1780948246600';
-const DATA_CACHE_NAME = 'prashnasarathi-data-cache-1780948246600';
+const CACHE_NAME = 'prashnasarathi-pwa-cache-1780983369049';
+const DATA_CACHE_NAME = 'prashnasarathi-data-cache-1780983369049';
 
 // Helper to fetch with a timeout fallback
 function fetchWithTimeout(request, timeout = 1000) {
@@ -62,30 +62,30 @@ const STATIC_ASSETS = [
   "/_next/static/chunks/324-26954518a83876c7.js",
   "/_next/static/chunks/689-dae23ab7fcb269ae.js",
   "/_next/static/chunks/180-ae226dde440fde50.js",
-  "/_next/static/chunks/750-1e66c7ea68ef83aa.js",
-  "/_next/static/chunks/app/layout-77a17152106659e4.js",
-  "/_next/static/chunks/app/admin/page-a2df2210821d09d7.js",
+  "/_next/static/chunks/750-befbd8e2a0fe0bb0.js",
+  "/_next/static/chunks/app/layout-8198c51fa60cb79f.js",
   "/_next/static/chunks/2bfc466f-47019a40064a549f.js",
   "/_next/static/chunks/147-f45f1800405fce62.js",
   "/_next/static/chunks/app/auth/page-45252ac1840cdf08.js",
-  "/_next/static/chunks/17-d0bf48d9ef10df88.js",
-  "/_next/static/chunks/app/faqs/page-55b928c3c6c09e97.js",
   "/_next/static/chunks/app/downloads/page-11ea97d7f03ab3f0.js",
-  "/_next/static/chunks/app/guidelines/page-d57936132754e5f7.js",
+  "/_next/static/chunks/17-415c15461d1f32b5.js",
   "/_next/static/chunks/668-a1aad2d89a5c5ffd.js",
-  "/_next/static/chunks/app/page-b864ce4a1da744d5.js",
-  "/_next/static/chunks/app/questions/[id]/page-1827159dc4608688.js",
-  "/_next/static/chunks/app/questions/ask/page-5fe4257ef8559020.js",
+  "/_next/static/chunks/app/faqs/[slug]/page-5b37c6572607b91f.js",
+  "/_next/static/chunks/app/faqs/page-55b928c3c6c09e97.js",
+  "/_next/static/chunks/app/admin/page-a2df2210821d09d7.js",
   "/_next/static/chunks/app/notifications/page-9ecf69722ff34ce9.js",
-  "/_next/static/chunks/app/saved/page-670361047c82b0f1.js",
+  "/_next/static/chunks/app/guidelines/page-d57936132754e5f7.js",
+  "/_next/static/chunks/app/questions/[id]/page-1827159dc4608688.js",
+  "/_next/static/chunks/app/page-b864ce4a1da744d5.js",
+  "/_next/static/chunks/app/questions/ask/page-5fe4257ef8559020.js",
   "/_next/static/chunks/413-a32d7ada44ebfdcc.js",
   "/_next/static/chunks/app/questions/page-799ad849fbb9827f.js",
-  "/_next/static/chunks/app/tags/[name]/page-7dd4ba9af9fe402f.js",
-  "/_next/static/chunks/app/search/page-e9b6da41fdfcbf6e.js",
-  "/_next/static/chunks/app/faqs/[slug]/page-5b37c6572607b91f.js",
-  "/_next/static/chunks/app/users/[username]/page-ef624d5838e9da87.js",
   "/_next/static/chunks/app/tags/page-68f59bc9f4ace876.js",
+  "/_next/static/chunks/app/search/page-2a055864d25bf12c.js",
+  "/_next/static/chunks/app/users/[username]/page-ef624d5838e9da87.js",
+  "/_next/static/chunks/app/tags/[name]/page-7dd4ba9af9fe402f.js",
   "/_next/static/chunks/app/users/page-c5e98069b5e23167.js",
+  "/_next/static/chunks/app/saved/page-670361047c82b0f1.js",
   "/_next/static/chunks/framework-f66176bb897dc684.js",
   "/_next/static/chunks/main-a895a058bfcf6af5.js",
   "/_next/static/chunks/pages/_app-72b849fbd24ac258.js",
@@ -131,8 +131,19 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and skip binary app installer files from caching
-  if (request.method !== 'GET' || url.pathname.startsWith('/downloads/')) {
+  // Skip invalid schemes (like chrome-extension://, extension://, file://, data:)
+  if (!url.protocol.startsWith('http')) {
+    return;
+  }
+
+  // Skip non-GET requests, socket.io connections, Next.js HMR, and binary app installer files
+  if (
+    request.method !== 'GET' || 
+    url.pathname.startsWith('/downloads/') || 
+    url.pathname.startsWith('/socket.io/') ||
+    url.pathname.includes('webpack-hmr') ||
+    url.pathname.includes('hot-update')
+  ) {
     return;
   }
 
@@ -165,7 +176,7 @@ self.addEventListener('fetch', (event) => {
   // Handle HTML document requests (Navigation) - Network-First
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetchWithTimeout(request, 1500)
+      fetchWithTimeout(request, 5000) // 5 seconds is safer for slow connections/cold boots
         .then((response) => {
           if (response && response.status === 200) {
             const responseClone = response.clone();
@@ -176,13 +187,11 @@ self.addEventListener('fetch', (event) => {
           return response;
         })
         .catch(() => {
-          // Serve the actual cached site page, home shell, or offline fallback page
+          // Serve the actual cached site page, or fallback to offline.html directly
+          // Do NOT fallback to '/' which triggers Next.js client-side chunk loading and crashes when offline.
           return caches.match(request).then((res) => {
             if (res) return res;
-            return caches.match('/', { ignoreSearch: true }).then((homeRes) => {
-              if (homeRes) return homeRes;
-              return caches.match('/offline.html');
-            });
+            return caches.match('/offline.html');
           });
         })
     );

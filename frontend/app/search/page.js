@@ -107,11 +107,25 @@ function SearchPageContent() {
       }
     };
 
-    doSearch();
-    doAiSearch();
+    const isOffline = typeof window !== 'undefined' && !navigator.onLine;
 
-    // Load suggestions in background
-    api.get('/search/suggestions').then(d => setSuggestions(d.suggestions || [])).catch(() => {});
+    doSearch();
+
+    if (isOffline) {
+      setAiLoading(false);
+      setAiResponse({
+        status: 'Offline',
+        answer: 'Namaste! PrashnaSārathi AI Assistant is currently offline. Showing local search results from cache instead.',
+        source: 'Local Cache'
+      });
+    } else {
+      doAiSearch();
+    }
+
+    // Load suggestions in background if online
+    if (!isOffline) {
+      api.get('/search/suggestions').then(d => setSuggestions(d.suggestions || [])).catch(() => {});
+    }
 
     // Cleanup: abort both requests if the query changes before they finish
     return () => {
