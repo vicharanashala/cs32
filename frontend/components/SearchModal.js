@@ -1,14 +1,11 @@
 'use client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { formatDate, truncate } from '@/lib/utils';
 import { useTypewriter } from '@/hooks/useTypewriter';
 import api from '@/lib/api';
-
-// Add voice input handling
 import { toast } from 'react-hot-toast';
-
 
 const getSearchResultLink = (result) => {
   const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');
@@ -25,36 +22,36 @@ const getSearchResultLink = (result) => {
   }
 };
 
-export default function SearchModal({ isOpen, onClose }) {
+const SearchModal = forwardRef(function SearchModal({ isOpen, onClose }, ref) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [type, setType] = useState('');
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [listening, setListening] = useState(false); // voice listening state
+  const [listening, setListening] = useState(false);
   const inputRef = useRef(null);
   const resultsRef = useRef(null);
   const { text: placeholderText, pause, resume } = useTypewriter();
   const recognitionRef = useRef(null);
 
+  useImperativeHandle(ref, () => ({
+    startListening: handleVoiceInput,
+  }));
+
   const handleVoiceInput = () => {
-    // Fallback: if SpeechRecognition not available, try AI transcription (placeholder)
+    // Fallback if SpeechRecognition not available
     if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
-      // Placeholder: send audio to AI service (not implemented)
       toast.error('Speech recognition not supported. Please type your query.');
       return;
     }
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     // Stop any existing recognition
     recognitionRef.current?.stop();
-
     const recognition = new SpeechRecognition();
     recognition.lang = 'en-US';
-    // Enable interim results for live feedback
     recognition.interimResults = true;
     recognition.maxAlternatives = 1;
-    // Default silence timeout (5s) and extended timeout for activation command (15s)
     const defaultSilenceTimeout = 5000;
     const extendedSilenceTimeout = 15000;
     let silenceTimer;
@@ -64,7 +61,6 @@ export default function SearchModal({ isOpen, onClose }) {
       silenceTimer = setTimeout(() => {
         recognition.stop();
         setListening(false);
-        // Perform search with current query (could be empty)
         performSearch(query);
       }, currentTimeout);
     };
@@ -85,13 +81,10 @@ export default function SearchModal({ isOpen, onClose }) {
           interim += transcript;
         }
       }
-      // Activation command detection (case-insensitive)
       const activationPhrase = /prashnasarathi\s+activate/i;
       if (activationPhrase.test(final)) {
-        // Switch to extended listening time and keep modal open
         currentTimeout = extendedSilenceTimeout;
-        setQuery(''); // clear query
-        // Optionally you could trigger opening the search modal via a callback if provided
+        setQuery('');
       }
       if (final.trim()) {
         setQuery(final.trim());
@@ -124,7 +117,6 @@ export default function SearchModal({ isOpen, onClose }) {
     };
   }, []);
 
-
   useEffect(() => {
     if (isOpen && inputRef.current) {
       inputRef.current.focus();
@@ -145,7 +137,6 @@ export default function SearchModal({ isOpen, onClose }) {
     }
   }, [query, pause, resume]);
 
-  // Helper to perform a search request
   const performSearch = async (searchQuery) => {
     const sanitized = searchQuery.trim().substring(0, 100).replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/[\u003c\u003e]/g, "");
     if (!sanitized) {
@@ -190,7 +181,7 @@ export default function SearchModal({ isOpen, onClose }) {
         router.push(link);
         onClose();
       } else {
-        const sanitized = query.trim().substring(0, 100).replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/[<>]/g, "");
+        const sanitized = query.trim().substring(0, 100).replace(/[\u0000-\u001F\u007F-\u009F]/g, "").replace(/[\u003c\u003e]/g, "");
         if (sanitized) {
           router.push(`/search?q=${encodeURIComponent(sanitized)}${type ? `&type=${type}` : ''}`);
         }
@@ -210,9 +201,7 @@ export default function SearchModal({ isOpen, onClose }) {
   useEffect(() => {
     if (selectedIndex >= 0 && resultsRef.current) {
       const selected = resultsRef.current.children[selectedIndex];
-      if (selected) {
-        selected.scrollIntoView({ block: 'nearest' });
-      }
+      if (selected) selected.scrollIntoView({ block: 'nearest' });
     }
   }, [selectedIndex]);
 
@@ -273,11 +262,7 @@ export default function SearchModal({ isOpen, onClose }) {
                 <button
                   key={t}
                   onClick={() => setType(t)}
-                  className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-all ${
-                    type === t 
-                      ? 'bg-[var(--color-primary)] text-white shadow-sm' 
-                      : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]'
-                  }`}
+                  className={`px-4 py-1.5 text-sm rounded-lg font-medium transition-all ${type === t ? 'bg-[var(--color-primary)] text-white shadow-sm' : 'bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:bg-[var(--color-border)] hover:text-[var(--color-text)]'}`}
                 >
                   {t || 'All'}
                 </button>
@@ -293,16 +278,11 @@ export default function SearchModal({ isOpen, onClose }) {
                   const title = result.title || result.question || result.faqTitle || result.displayName || result.username || 'Untitled';
                   const desc = result.body || result.description || result.answer || result.bio || '';
                   const link = getSearchResultLink(result);
-
                   return (
                     <li key={result.id}>
                       <button
                         onClick={() => handleResultClick(result)}
-                        className={`w-full text-left px-5 py-4 flex items-start gap-3 transition-colors ${
-                          selectedIndex === index 
-                            ? 'bg-[var(--color-primary-subtle)]' 
-                            : 'hover:bg-[var(--color-bg-tertiary)]'
-                        }`}
+                        className={`w-full text-left px-5 py-4 flex items-start gap-3 transition-colors ${selectedIndex === index ? 'bg-[var(--color-primary-subtle)]' : 'hover:bg-[var(--color-bg-tertiary)]'}`}
                       >
                         <span className="badge-gray text-xs capitalize mt-0.5 shrink-0">{typeLabel}</span>
                         <div className="flex-1 min-w-0">
@@ -338,19 +318,9 @@ export default function SearchModal({ isOpen, onClose }) {
               <div className="py-12 text-center">
                 <p className="text-[var(--color-text-muted)] text-sm">Start typing to search...</p>
                 <div className="flex items-center justify-center gap-6 mt-5 text-xs text-[var(--color-text-muted)]">
-                  <span className="flex items-center gap-1.5">
-                    <kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">↑</kbd>
-                    <kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">↓</kbd> 
-                    navigate
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">Enter</kbd> 
-                    select
-                  </span>
-                  <span className="flex items-center gap-1.5">
-                    <kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">Esc</kbd> 
-                    close
-                  </span>
+                  <span className="flex items-center gap-1.5"><kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">↑</kbd> <kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">↓</kbd> navigate</span>
+                  <span className="flex items-center gap-1.5"><kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">Enter</kbd> select</span>
+                  <span className="flex items-center gap-1.5"><kbd className="px-2 py-1 bg-[var(--color-bg-tertiary)] rounded border border-[var(--color-border)]">Esc</kbd> close</span>
                 </div>
               </div>
             ) : null}
@@ -359,4 +329,6 @@ export default function SearchModal({ isOpen, onClose }) {
       </div>
     </div>
   );
-}
+});
+
+export default SearchModal;
