@@ -1,5 +1,5 @@
-const CACHE_NAME = 'prashnasarathi-pwa-cache-1781002316978';
-const DATA_CACHE_NAME = 'prashnasarathi-data-cache-1781002316978';
+const CACHE_NAME = 'prashnasarathi-pwa-cache-1781002707158';
+const DATA_CACHE_NAME = 'prashnasarathi-data-cache-1781002707158';
 
 // Helper to fetch with a timeout fallback
 function fetchWithTimeout(request, timeout = 1000) {
@@ -68,25 +68,25 @@ const STATIC_ASSETS = [
   "/_next/static/chunks/147-f45f1800405fce62.js",
   "/_next/static/chunks/app/auth/page-cad4c585cdc71c82.js",
   "/_next/static/chunks/app/downloads/page-c1dfa542d7436702.js",
-  "/_next/static/chunks/app/guidelines/page-d57936132754e5f7.js",
-  "/_next/static/chunks/app/notifications/page-52e19cf206857a2a.js",
   "/_next/static/chunks/17-d5e83a249188c055.js",
-  "/_next/static/chunks/793-593a48dea3ea6a9a.js",
   "/_next/static/chunks/668-5acdeb7c3274ff95.js",
-  "/_next/static/chunks/app/page-1e783032a573c2df.js",
+  "/_next/static/chunks/app/faqs/[slug]/page-9e97131fa8f1186d.js",
+  "/_next/static/chunks/app/faqs/page-620c42501e04faaa.js",
+  "/_next/static/chunks/app/guidelines/page-d57936132754e5f7.js",
+  "/_next/static/chunks/app/admin/page-12119c7b36a3a159.js",
+  "/_next/static/chunks/app/notifications/page-52e19cf206857a2a.js",
+  "/_next/static/chunks/793-593a48dea3ea6a9a.js",
+  "/_next/static/chunks/app/page-c7a7a123179903e5.js",
+  "/_next/static/chunks/app/questions/ask/page-27d6c22404c4a096.js",
   "/_next/static/chunks/413-45c508201d91cf36.js",
   "/_next/static/chunks/app/questions/page-9dc4f714a5ab5299.js",
-  "/_next/static/chunks/app/faqs/[slug]/page-9e97131fa8f1186d.js",
-  "/_next/static/chunks/app/saved/page-3c1b2d9edd0562de.js",
-  "/_next/static/chunks/app/admin/page-12119c7b36a3a159.js",
-  "/_next/static/chunks/app/faqs/page-620c42501e04faaa.js",
   "/_next/static/chunks/app/search/page-e1136f33b9cd1f61.js",
-  "/_next/static/chunks/app/questions/ask/page-27d6c22404c4a096.js",
-  "/_next/static/chunks/app/tags/page-45d63daa4360c6aa.js",
-  "/_next/static/chunks/app/users/[username]/page-fe5b48715ffd752b.js",
   "/_next/static/chunks/app/questions/[id]/page-c8bb66d83d9273af.js",
-  "/_next/static/chunks/app/users/page-12d5407eb652b662.js",
+  "/_next/static/chunks/app/saved/page-3c1b2d9edd0562de.js",
   "/_next/static/chunks/app/tags/[name]/page-95061f15406bd5b7.js",
+  "/_next/static/chunks/app/users/page-12d5407eb652b662.js",
+  "/_next/static/chunks/app/users/[username]/page-fe5b48715ffd752b.js",
+  "/_next/static/chunks/app/tags/page-45d63daa4360c6aa.js",
   "/_next/static/chunks/framework-f66176bb897dc684.js",
   "/_next/static/chunks/main-a895a058bfcf6af5.js",
   "/_next/static/chunks/pages/_app-72b849fbd24ac258.js",

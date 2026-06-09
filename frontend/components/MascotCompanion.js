@@ -40,19 +40,20 @@ export default function MascotCompanion() {
   // Helper: check if a date string represents yesterday
   const checkIsYesterday = (dateStr) => {
     if (!dateStr) return false;
-    const parts = dateStr.split('-');
-    const dateVal = new Date(parts[0], parts[1] - 1, parts[2]);
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(today.getDate() - 1);
     
-    const yesterday = new Date();
-    yesterday.setDate(yesterday.getDate() - 1);
+    const yyyy = yesterday.getFullYear();
+    const mm = String(yesterday.getMonth() + 1).padStart(2, '0');
+    const dd = String(yesterday.getDate()).padStart(2, '0');
+    const yesterdayStr = `${yyyy}-${mm}-${dd}`;
     
-    return dateVal.getFullYear() === yesterday.getFullYear() &&
-           dateVal.getMonth() === yesterday.getMonth() &&
-           dateVal.getDate() === yesterday.getDate();
+    return dateStr === yesterdayStr;
   };
 
-  // Load state and evaluate daily streak on mount
-  useEffect(() => {
+  // Main evaluation logic for loading state and claiming daily logins
+  const checkAndUpdateDailyStreak = () => {
     if (typeof window === 'undefined') return;
     const stored = localStorage.getItem('prashnasarathi_mascot');
     
@@ -70,52 +71,21 @@ export default function MascotCompanion() {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (parsed.pos) {
-          currentPos = parsed.pos;
-          setPos(parsed.pos);
-        }
-        if (parsed.mascotName) {
-          currentMascotName = parsed.mascotName;
-          setMascotName(parsed.mascotName);
-          setTempName(parsed.mascotName);
-        }
-        if (parsed.streak !== undefined) {
-          currentStreak = parsed.streak;
-          setStreak(parsed.streak);
-        }
-        if (parsed.exp !== undefined) {
-          currentExp = parsed.exp;
-          setExp(parsed.exp);
-        }
-        if (parsed.level !== undefined) {
-          currentLevel = parsed.level;
-          setLevel(parsed.level);
-        }
-        if (parsed.currentStage) {
-          currentStageVal = parsed.currentStage;
-          setCurrentStage(parsed.currentStage);
-        }
-        if (parsed.personality) {
-          currentPersonalityVal = parsed.personality;
-          setPersonality(parsed.personality);
-        }
-        if (parsed.claimedRewards) {
-          currentClaimedRewards = parsed.claimedRewards;
-          setClaimedRewards(parsed.claimedRewards);
-        }
-        if (parsed.activeAccessories) {
-          currentAccessories = parsed.activeAccessories;
-          setActiveAccessories(parsed.activeAccessories);
-        }
-        if (parsed.lastLoginDate) {
-          savedLastLogin = parsed.lastLoginDate;
-        }
+        if (parsed.pos) currentPos = parsed.pos;
+        if (parsed.mascotName) currentMascotName = parsed.mascotName;
+        if (parsed.streak !== undefined) currentStreak = parsed.streak;
+        if (parsed.exp !== undefined) currentExp = parsed.exp;
+        if (parsed.level !== undefined) currentLevel = parsed.level;
+        if (parsed.currentStage) currentStageVal = parsed.currentStage;
+        if (parsed.personality) currentPersonalityVal = parsed.personality;
+        if (parsed.claimedRewards) currentClaimedRewards = parsed.claimedRewards;
+        if (parsed.activeAccessories) currentAccessories = parsed.activeAccessories;
+        if (parsed.lastLoginDate) savedLastLogin = parsed.lastLoginDate;
       } catch (e) {
         console.error('Failed to parse saved mascot data:', e);
       }
     }
 
-    // Process Daily Login Streak real logic
     const todayStr = getLocalDateString();
     if (savedLastLogin !== todayStr) {
       let finalStreak = currentStreak;
@@ -147,10 +117,20 @@ export default function MascotCompanion() {
         setTimeout(() => launchConfetti(), 300);
       }
 
+      // Auto evolve stage based on level
+      if (finalLevel >= 4) {
+        currentStageVal = 'ultimate';
+      } else if (finalLevel >= 3) {
+        currentStageVal = 'evolved';
+      } else {
+        currentStageVal = 'junior';
+      }
+
       // Update state hooks
       setStreak(finalStreak);
       setExp(finalExp);
       setLevel(finalLevel);
+      setCurrentStage(currentStageVal);
 
       // Save state
       const updatedData = {
@@ -166,7 +146,32 @@ export default function MascotCompanion() {
         lastLoginDate: todayStr
       };
       localStorage.setItem('prashnasarathi_mascot', JSON.stringify(updatedData));
+    } else {
+      // Just load the values normally if already logged in today
+      setStreak(currentStreak);
+      setExp(currentExp);
+      setLevel(currentLevel);
+      setMascotName(currentMascotName);
+      setTempName(currentMascotName);
+      setPos(currentPos);
+      setCurrentStage(currentStageVal);
+      setPersonality(currentPersonalityVal);
+      setClaimedRewards(currentClaimedRewards);
+      setActiveAccessories(currentAccessories);
     }
+  };
+
+  // Run on mount and also register window focus checker
+  useEffect(() => {
+    checkAndUpdateDailyStreak();
+  }, []);
+
+  useEffect(() => {
+    const handleFocusCheck = () => {
+      checkAndUpdateDailyStreak();
+    };
+    window.addEventListener('focus', handleFocusCheck);
+    return () => window.removeEventListener('focus', handleFocusCheck);
   }, []);
 
   // Save changes to localStorage helper
@@ -203,6 +208,7 @@ export default function MascotCompanion() {
     const newExp = exp + 15;
     let nextLevel = level;
     let finalExp = newExp;
+    let nextStage = currentStage;
 
     if (finalExp >= 140) {
       nextLevel += 1;
@@ -218,10 +224,20 @@ export default function MascotCompanion() {
       });
     }
 
+    // Auto evolve stage
+    if (nextLevel >= 4) {
+      nextStage = 'ultimate';
+    } else if (nextLevel >= 3) {
+      nextStage = 'evolved';
+    } else {
+      nextStage = 'junior';
+    }
+
     setStreak(nextStreak);
     setExp(finalExp);
     setLevel(nextLevel);
-    saveState({ streak: nextStreak, exp: finalExp, level: nextLevel });
+    setCurrentStage(nextStage);
+    saveState({ streak: nextStreak, exp: finalExp, level: nextLevel, currentStage: nextStage });
   };
 
   const handleClaimReward = (rewardId, spAmount) => {
