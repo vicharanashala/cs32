@@ -9,7 +9,7 @@ export default function MascotCompanion() {
   const [mascotName, setMascotName] = useState('Pyro');
   const [streak, setStreak] = useState(1);
   const [exp, setExp] = useState(0);
-  const [level, setLevel] = useState(1);
+  const [level, setLevel] = useState(0);
   const [currentStage, setCurrentStage] = useState('junior'); // 'junior', 'evolved', 'ultimate'
   const [personality, setPersonality] = useState('calm'); // 'calm', 'fiery', 'bubbly'
   const [claimedRewards, setClaimedRewards] = useState([]); // Array of reward ids, e.g. ['lv5', 'lv6', 'lv7']
@@ -60,7 +60,7 @@ export default function MascotCompanion() {
     let currentMascotName = 'Pyro';
     let currentStreak = 1;
     let currentExp = 0;
-    let currentLevel = 1;
+    let currentLevel = 0;
     let currentStageVal = 'junior';
     let currentPersonalityVal = 'calm';
     let currentClaimedRewards = [];
@@ -626,21 +626,6 @@ export default function MascotCompanion() {
               </button>
             </div>
 
-            {/* Sandbox details */}
-            <div className="border-t border-white/10 pt-2 flex items-center justify-between">
-              <span className="text-[9px] text-slate-500">Mascot Developer Sandbox</span>
-              <button 
-                onClick={() => {
-                  const nextLevel = level + 1;
-                  setLevel(nextLevel);
-                  toast.success(`Mascot level up! Unlocked Lv. ${nextLevel}`);
-                  saveState({ level: nextLevel });
-                }}
-                className="text-[9px] text-orange-500/80 hover:text-orange-400 hover:underline"
-              >
-                +1 Level Demo
-              </button>
-            </div>
           </div>
         </div>
       )}
