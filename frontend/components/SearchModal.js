@@ -8,11 +8,7 @@ import api from '@/lib/api';
 
 // Add voice input handling
 import { toast } from 'react-hot-toast';
-import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { formatDate, truncate } from '@/lib/utils';
-import { useTypewriter } from '@/hooks/useTypewriter';
-import api from '@/lib/api';
+
 
 const getSearchResultLink = (result) => {
   const typeLabel = result._type || (result.body !== undefined ? 'question' : result.description !== undefined ? 'faq' : 'user');

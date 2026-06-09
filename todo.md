@@ -100,3 +100,12 @@
 ---
 
 *All items above reflect the current state of the repository.*
+
+## Folder Structure
+- `backend/` – Express API server (port 5000) with controllers, models, services, etc.
+- `frontend/` – Next.js 14 App Router (port 3000) with app pages, components, context, hooks, lib, public, pwa, services, styles.
+- `docker-compose.yml` – Docker/Podman orchestration configuration.
+- `nginx/` – Nginx reverse proxy configurations.
+- `setup-docker.sh` & `setup.sh` – Deployment scripts.
+- `faqs-complete.json` & `metadata.json` – Seed data for FAQs.
+- `vercel.json` – Vercel deployment configuration.
