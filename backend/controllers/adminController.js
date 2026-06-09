@@ -552,6 +552,7 @@ exports.approvePost = async (req, res, next) => {
 
     // Trigger side-effects since it's now public
     if (postType === 'Question') {
+      await Answer.updateMany({ question: post._id, visibility: 'pending' }, { visibility: 'public' });
       const populated = await Question.findById(post._id)
         .populate('author', 'username displayName avatar reputation')
         .populate('tags', 'name color')

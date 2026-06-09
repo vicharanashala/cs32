@@ -13,6 +13,7 @@ export default function MascotCompanion() {
   const [currentStage, setCurrentStage] = useState('junior'); // 'junior', 'evolved', 'ultimate'
   const [personality, setPersonality] = useState('calm'); // 'calm', 'fiery', 'bubbly'
   const [claimedRewards, setClaimedRewards] = useState([]); // Array of reward ids, e.g. ['lv5', 'lv6', 'lv7']
+  const [hasClaimedToday, setHasClaimedToday] = useState(false);
   
   // Custom accessories toggles (unlocked and active)
   const [activeAccessories, setActiveAccessories] = useState({
@@ -55,7 +56,7 @@ export default function MascotCompanion() {
   // Main evaluation logic for loading state and claiming daily logins
   const checkAndUpdateDailyStreak = () => {
     if (typeof window === 'undefined') return;
-    const stored = localStorage.getItem('prashnasarathi_mascot');
+    const stored = localStorage.getItem('prashnasarathi_mascot_v3');
     
     let currentMascotName = 'Pyro';
     let currentStreak = 1;
@@ -89,21 +90,29 @@ export default function MascotCompanion() {
     const todayStr = getLocalDateString();
     if (savedLastLogin !== todayStr) {
       let finalStreak = currentStreak;
-      let finalExp = currentExp + 15;
+      let finalExp = currentExp;
       let finalLevel = currentLevel;
 
       if (savedLastLogin === '') {
-        // First time initialization
+        // First time initialization - start strictly at 0 level and 0 exp!
         finalStreak = 1;
+        finalExp = 0;
+        finalLevel = 0;
         toast(`Welcome! ${currentMascotName} is now active. Log in daily to grow!`, { icon: '🐣' });
-      } else if (checkIsYesterday(savedLastLogin)) {
-        // Daily login continued
-        finalStreak += 1;
-        toast.success(`Daily Login Claimed! Streak: ${finalStreak} days. +15 EXP`, { icon: '🔥' });
       } else {
-        // Streak broken
-        finalStreak = 1;
-        toast(`Login streak reset to 1 day, but ${currentMascotName} welcomed you back with +15 EXP!`, { icon: '🌅' });
+        if (checkIsYesterday(savedLastLogin)) {
+          // Daily login continued
+          finalStreak += 1;
+          finalExp = currentExp + 15;
+          toast.success(`Daily Login Claimed! Streak: ${finalStreak} days. +15 EXP`, { icon: '🔥' });
+        } else {
+          // Streak broken - reset progress entirely!
+          finalStreak = 1;
+          finalExp = 0;
+          finalLevel = 0;
+          currentStageVal = 'junior';
+          toast(`Oh no! You missed a day. Your login streak and ${currentMascotName}'s progress reset to Level 0!`, { icon: '🌅', duration: 5000 });
+        }
       }
 
       // Check level up (140 exp needed)
@@ -131,6 +140,7 @@ export default function MascotCompanion() {
       setExp(finalExp);
       setLevel(finalLevel);
       setCurrentStage(currentStageVal);
+      setHasClaimedToday(true);
 
       // Save state
       const updatedData = {
@@ -145,7 +155,7 @@ export default function MascotCompanion() {
         activeAccessories: currentAccessories,
         lastLoginDate: todayStr
       };
-      localStorage.setItem('prashnasarathi_mascot', JSON.stringify(updatedData));
+      localStorage.setItem('prashnasarathi_mascot_v3', JSON.stringify(updatedData));
     } else {
       // Just load the values normally if already logged in today
       setStreak(currentStreak);
@@ -158,6 +168,7 @@ export default function MascotCompanion() {
       setPersonality(currentPersonalityVal);
       setClaimedRewards(currentClaimedRewards);
       setActiveAccessories(currentAccessories);
+      setHasClaimedToday(true);
     }
   };
 
@@ -190,7 +201,7 @@ export default function MascotCompanion() {
       lastLoginDate: todayStr,
       ...updates
     };
-    localStorage.setItem('prashnasarathi_mascot', JSON.stringify(data));
+    localStorage.setItem('prashnasarathi_mascot_v3', JSON.stringify(data));
   };
 
   // Sparkles
@@ -204,6 +215,8 @@ export default function MascotCompanion() {
 
   // --- Handlers ---
   const handleSimulateDailyLogin = () => {
+    if (hasClaimedToday) return;
+
     const nextStreak = streak + 1;
     const newExp = exp + 15;
     let nextLevel = level;
@@ -237,6 +250,7 @@ export default function MascotCompanion() {
     setExp(finalExp);
     setLevel(nextLevel);
     setCurrentStage(nextStage);
+    setHasClaimedToday(true);
     saveState({ streak: nextStreak, exp: finalExp, level: nextLevel, currentStage: nextStage });
   };
 
@@ -620,9 +634,14 @@ export default function MascotCompanion() {
             <div className="flex gap-2">
               <button
                 onClick={handleSimulateDailyLogin}
-                className="flex-1 py-2.5 rounded-xl text-xs font-bold bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 shadow-md hover:shadow-orange-500/25 active:scale-[0.98] transition-all flex items-center justify-center gap-1"
+                disabled={hasClaimedToday}
+                className={`flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 ${
+                  hasClaimedToday 
+                    ? 'bg-slate-800 text-slate-500 border border-white/5 cursor-not-allowed'
+                    : 'bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 shadow-md hover:shadow-orange-500/25 active:scale-[0.98]'
+                }`}
               >
-                <span>🔥 Claim Daily Login</span>
+                <span>{hasClaimedToday ? '✓ Claimed Today' : '🔥 Claim Daily Login'}</span>
               </button>
             </div>
 

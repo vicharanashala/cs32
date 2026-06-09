@@ -50,48 +50,48 @@ A community-driven Q&A and FAQ platform designed to help students ask doubts wit
 ```
 prashnasarathi/
 ├── backend/              # Express API server (port 5000)
-│   ├── assets/           # Static asset templates and resources
-│   ├── config/           # DB, Redis, ES, Firebase, Kafka connections
+│   ├── assets/           # Static email templates and system templates
+│   ├── config/           # Database, Redis, Elasticsearch, Firebase Admin, and Kafka connections
 │   ├── controllers/      # Route handlers (auth, questions, answers, search, etc.)
 │   ├── data/             # Local database JSON exports
-│   ├── middleware/       # JWT auth, error handling, rate limiting, uploads
-│   ├── models/           # Mongoose schemas (User, Question, Answer, FAQ, etc.)
-│   ├── routes/           # Express route definitions (12 route files)
+│   ├── middleware/       # JWT auth, error handling, rate limiting, file upload
+│   ├── models/           # Mongoose schemas (User, Question, Answer, FAQ, SpurtiPointLog, AuditLog, etc.)
+│   ├── routes/           # Express endpoint router definitions
 │   ├── seeds/            # Database seed scripts
-│   ├── services/         # ES search, recommendations, analytics, push notifications, auto-answer
-│   ├── socket/           # Socket.IO real-time event setups
+│   ├── services/         # ES Search, recommendations, notifications, email worker, and auto-answer (Gemini bot)
+│   ├── socket/           # Socket.IO real-time event server configuration
 │   ├── uploads/          # Local storage path for uploaded user files
-│   └── utils/            # Helpers, validators, permissions, email templates
-├── frontend/             # Next.js 14 App Router (port 3000)
-│   ├── app/              # App Router pages (faqs, questions, admin, auth, saved, etc.)
-│   ├── components/       # Shared React components (AI widget, Search input, cards, etc.)
-│   ├── context/          # Auth, Socket, Theme, and Notification Contexts
-│   ├── data/             # Frontend local static JSON metadata
+│   └── utils/            # Validators, email transposer, permissions
+├── frontend/             # Next.js 14 App Router client (port 3000)
+│   ├── app/              # App Router pages (faqs, questions, admin, saved, search, notifications, etc.)
+│   ├── components/       # Shared UI components (MascotCompanion, ReportIssueButton, OnboardingModal, SearchModal, recommended FAQs, Tiptap editor)
+│   ├── context/          # Auth, Socket, Theme, Notifications, and VoiceCommand Contexts
+│   ├── data/             # Frontend static local JSON data
 │   ├── hooks/            # Custom hooks (keyboard shortcuts, PWA installers)
-│   ├── lib/              # API clients & utilities
-│   ├── public/           # Static files (manifest, sw.js, icons, etc.)
-│   ├── pwa/              # PWA service worker configurations
-│   ├── scripts/          # Build scripts (sw.js compiler, versions)
-│   ├── services/         # Frontend operations and API services
-│   ├── styles/           # Global styles and Tailwind configuration
-│   └── tailwind.config.js# Custom Tailwind design utility mappings
+│   ├── lib/              # API clients & Axios interceptors
+│   ├── public/           # Static public files (manifest, Service Worker sw.js, icons, etc.)
+│   ├── pwa/              # PWA service worker configurations and wrapper
+│   ├── scripts/          # Service Worker build scripts
+│   ├── services/         # Frontend API calls wrapper services
+│   ├── styles/           # Tailwind configuration and global CSS layout style
+│   └── tailwind.config.js# Custom styling utility mappings
 ├── FastAPI_python_model/ # FastAPI AI microservice (spam & noise classification)
-│   ├── main.py           # FastAPI server entry point
-│   ├── Dockerfile        # Container setup for Python dependencies
+│   ├── main.py           # Python server entry point
+│   ├── Dockerfile        # Container build definition
 │   └── requirements.txt  # Python packages list
 ├── faq-service/          # Python FAQ classification microservice helper
 │   ├── main.py           # Python script entry point
 │   └── requirements.txt  # Python dependencies list
 ├── nginx/                # Nginx reverse proxy configurations
-├── podman/               # Podman/Docker deployment configuration files
+├── podman/               # Standalone Docker deployment configurations
 ├── kafka/                # Optional Kafka docker-compose configurations
 ├── docker-compose.yml    # Multi-service container orchestration mapping
 ├── .dockerignore         # Docker build context exclusions
-├── setup-docker.sh       # Cross-platform Docker setup script
+├── setup-docker.sh       # Unified Docker container execution setup script
 ├── faqs-complete.json    # 126 FAQ items (seed data)
 ├── metadata.json         # Category metadata
 ├── vercel.json           # Frontend Vercel hosting configuration
-└── todo.md               # Tracking document for fixes and features
+└── todo.md               # Roadmap tracking and checklist document
 ```
 
 ---
@@ -365,6 +365,46 @@ Students can indicate their confidence level when answering:
 - Me-too counts update instantly
 - Answer counts refresh in real-time
 - Solved metrics update without page reload
+
+---
+
+### Interactive Mascot Companion & Gamification
+
+#### Draggable Glassmorphic Mascot (Pyro)
+- Interactive, draggable mascot companion displaying visual micro-animations and stage evolution.
+- Positioned floating at the bottom-right of the lobby view for logged-in users.
+- Remembers drag offsets and retains positioning persistently across sessions using localized coordinate storage.
+
+#### Daily Login Streak Tracker & Progression
+- Evaluates logins on page mount and window focus using robust date comparison.
+- Daily logins award **+15 EXP** and increment the user's consecutive day streak.
+- **Hardcore Streak Mechanic**: If a user misses even a single day, their streak resets to 1, their level resets to **Level 0**, and their EXP resets to **0** (starts the progression over from scratch).
+- Evolve stages unlock automatically based on level milestones:
+  - **Level 0-2**: Junior Stage
+  - **Level 3**: Evolved Stage
+  - **Level 4+**: Ultimate Stage
+
+#### Spurti Points (SP) Shop & Accessories
+- Unlock and claim milestone rewards using Spurti Points (SP) earned from Q&A contributions.
+- Customize Pyro's appearance with accessories like **Shark Hat** or **Balloons**.
+
+---
+
+### Voice Command & AI Assistance
+
+#### Voice Search Activation ("Hey PrashnaSarathi")
+- Speech recognition listens for the custom wake-up command `"Hey PrashnaSarathi"`.
+- Instantly opens the global search bar modal and automatically begins recording the query without clicking.
+- Direct microphone button on the lobby search triggers active voice input instantly.
+
+#### AI Auto-Answer Service
+- Automatically parses incoming public student questions on the backend.
+- Generates high-confidence, context-grounded baseline assistance to help students resolve doubts immediately.
+- Duplicate questions trigger automatic reference matching and direct the student to existing answered paths.
+
+#### Media & File Attachment Support
+- Send useful hyperlinks when asking questions.
+- Attach files/images to support answers when responding to student doubts.
 
 ---
 

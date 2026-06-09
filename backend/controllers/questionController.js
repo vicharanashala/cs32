@@ -151,13 +151,6 @@ exports.createQuestion = async (req, res, next) => {
       } catch (emailErr) {
         console.error('Email notification error:', emailErr.message);
       }
-
-      // Trigger AI auto-answer (fire-and-forget — never blocks the user response)
-      setImmediate(() => {
-        triggerAutoAnswer(populated).catch(err =>
-          console.error('[AutoAnswer] Background trigger error:', err.message)
-        );
-      });
     } else if (visibility === 'pending') {
       try {
         const { emitToAdmin } = require('../socket');
@@ -165,6 +158,15 @@ exports.createQuestion = async (req, res, next) => {
       } catch (err) {
         console.error('Socket notification error for pending question:', err.message);
       }
+    }
+
+    if (visibility === 'public' || visibility === 'pending') {
+      // Trigger AI auto-answer (fire-and-forget — never blocks the user response)
+      setImmediate(() => {
+        triggerAutoAnswer(populated).catch(err =>
+          console.error('[AutoAnswer] Background trigger error:', err.message)
+        );
+      });
     }
 
     const isModOrAdmin = req.user && (req.user.role === 'admin' || req.user.role === 'moderator');

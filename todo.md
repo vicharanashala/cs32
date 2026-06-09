@@ -20,6 +20,9 @@
 - ✅ Real‑time updates via Socket.IO (new answers, me‑too, solved counts)
 - ✅ Spurti Points (Sp) rewards (+10 Sp) on accepted answers, deductions (‑10 Sp) on unaccepted answers
 - ✅ **Voice‑to‑Text for Asking** (microphone button on Ask Question page)
+- ✅ **File attachments & Image uploading** in rich-text answers
+- ✅ **Hyperlink sharing** when asking and answering questions
+- ✅ **AI Auto-Answer service** (Gemini bot) for public and pending questions with automatic approval sync and duplicate prevention
 
 ### FAQ System
 - ✅ Browse FAQ pages by category
@@ -31,6 +34,7 @@
 ### Search & Discovery
 - ✅ Full‑text search across questions, FAQs, users
 - ✅ SearchModal (Ctrl+K or /) with voice‑to‑text support
+- ✅ **Voice search activated on button press** to open search and start listening on demand
 - ✅ Trending searches (Redis)
 - ✅ Search result caching (Redis 60 s)
 - ✅ Tag browsing and filtering
@@ -46,6 +50,14 @@
 - ✅ Role system (user, moderator, admin)
 - ✅ Ban/unban users (admin)
 - ✅ Spurti Points balance card & transaction history
+
+### Gamification & Mascot (Pyro)
+- ✅ Draggable glassmorphic floating Mascot companion
+- ✅ Persistent viewport coordinate storage across sessions
+- ✅ Daily login streak tracking (focused & mount evaluation)
+- ✅ **Hardcore streak reset penalty** (missed logins reset level to 0, EXP to 0)
+- ✅ Automatic evolutionary stages (Junior, Evolved, Ultimate) based on levels
+- ✅ Accessory shop customization (Shark Hat, Balloons) powered by Spurti Points (SP)
 
 ### Admin / Moderation
 - ✅ Admin dashboard with stats
@@ -102,10 +114,14 @@
 *All items above reflect the current state of the repository.*
 
 ## Folder Structure
-- `backend/` – Express API server (port 5000) with controllers, models, services, etc.
-- `frontend/` – Next.js 14 App Router (port 3000) with app pages, components, context, hooks, lib, public, pwa, services, styles.
+- `backend/` – Express API server (port 5000) with controllers, models, routes, services (auto-answer, etc.), socket configuration.
+- `frontend/` – Next.js 14 App Router (port 3000) with app pages, components (MascotCompanion, ReportIssueButton, etc.), context, hooks, lib, public, pwa, services, styles.
+- `FastAPI_python_model/` – Python FastAPI spam and noise classification microservice.
+- `faq-service/` – Python FAQ helper classification service.
 - `docker-compose.yml` – Docker/Podman orchestration configuration.
 - `nginx/` – Nginx reverse proxy configurations.
 - `setup-docker.sh` & `setup.sh` – Deployment scripts.
 - `faqs-complete.json` & `metadata.json` – Seed data for FAQs.
 - `vercel.json` – Vercel deployment configuration.
+- `todo.md` – Roadmap tracking and checklist document.
+- `README.md` – Project documentation.

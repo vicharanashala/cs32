@@ -282,6 +282,18 @@ const generateAndPostAutoAnswer = async (question, botUser) => {
 
     console.log(`[AutoAnswer] Processing question: "${question.title}" (${question._id})`);
 
+    // Prevent duplicate AI answers if bot already responded
+    const existingBotAnswer = await Answer.findOne({ question: question._id, author: botUser._id, isDeleted: false });
+    if (existingBotAnswer) {
+      console.log(`[AutoAnswer] Bot user ${botUser.username} already answered question ${question._id}. Skipping.`);
+      if (question.visibility === 'public' && existingBotAnswer.visibility === 'pending') {
+        existingBotAnswer.visibility = 'public';
+        await existingBotAnswer.save();
+        console.log(`[AutoAnswer] Updated existing pending answer ${existingBotAnswer._id} to public.`);
+      }
+      return;
+    }
+
     // ── Step 1: Validate question content ────────────────────────────────
     const validation = validateQuestion(question.title, question.body || '');
     if (!validation.valid) {
@@ -308,7 +320,7 @@ Please refer to the link above to view existing answers and discussions.`;
           body: duplicateAnswerBody,
           question: question._id,
           author: botUser._id,
-          visibility: 'public',
+          visibility: question.visibility || 'public',
           isOfficial: true,
           confidenceLevel: 'high',
         });
@@ -414,7 +426,7 @@ ${aiText.trim()}`;
       body: botAnswerBody,
       question: question._id,
       author: botUser._id,
-      visibility: 'public',
+      visibility: question.visibility || 'public',
       isOfficial: true,
       confidenceLevel: isGeneralKnowledge ? 'low' : documents.length >= 3 ? 'high' : documents.length === 2 ? 'medium' : 'low',
     });
@@ -488,8 +500,8 @@ const getBotUser = async () => {
  */
 const triggerAutoAnswer = async (question) => {
   try {
-    // Only trigger for public questions
-    if (question.visibility !== 'public') {
+    // Only trigger for public or pending questions
+    if (question.visibility !== 'public' && question.visibility !== 'pending') {
       console.log(`[AutoAnswer] Skipping — question visibility is "${question.visibility}".`);
       return;
     }
