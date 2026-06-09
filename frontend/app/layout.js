@@ -10,10 +10,12 @@ import OnboardingModal from '@/components/OnboardingModal';
 import TermsAndConditionsModal from '@/components/TermsAndConditionsModal';
 import ReportIssueButton from '@/components/ReportIssueButton';
 import NetworkStatus from '@/components/NetworkStatus';
-
 import { Toaster } from 'react-hot-toast';
 import PwaProvider from '@/pwa/PwaProvider';
 import ErrorBoundary from '@/components/ErrorBoundary';
+import SearchModal from '@/components/SearchModal';
+import { VoiceCommandProvider, useVoiceCommand } from '@/context/VoiceCommandContext';
+import { useRef } from 'react';
 
 export const metadata = {
   title: 'PrashnaSārathi - Community Q&A and FAQ Platform',
@@ -27,6 +29,9 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+  const { isSearchOpen, openSearch, closeSearch, autoStart } = useVoiceCommand();
+  const searchRef = useRef(null);
+
   return (
     <html lang="en">
       <head>
@@ -74,6 +79,13 @@ export default function RootLayout({ children }) {
                       </ErrorBoundary>
                     </main>
                     <Footer />
+                    {/* Search Modal */}
+                    <SearchModal
+                      ref={searchRef}
+                      isOpen={isSearchOpen}
+                      onClose={closeSearch}
+                      autoStart={autoStart}
+                    />
                   </PwaProvider>
                 </ThemeProvider>
               </KeyboardProvider>

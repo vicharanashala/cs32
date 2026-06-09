@@ -22,7 +22,7 @@ const getSearchResultLink = (result) => {
   }
 };
 
-const SearchModal = forwardRef(function SearchModal({ isOpen, onClose }, ref) {
+const SearchModal = forwardRef(function SearchModal({ isOpen, onClose, autoStart }, ref) {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [type, setType] = useState('');
@@ -36,79 +36,104 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose }, ref) {
   const recognitionRef = useRef(null);
 
   useImperativeHandle(ref, () => ({
-    startListening: handleVoiceInput,
+    startListening: handleVoiceInput
   }));
 
-  const handleVoiceInput = () => {
-    // Fallback if SpeechRecognition not available
-    if (!('SpeechRecognition' in window) && !('webkitSpeechRecognition' in window)) {
-      toast.error('Speech recognition not supported. Please type your query.');
-      return;
-    }
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    // Stop any existing recognition
-    recognitionRef.current?.stop();
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = true;
-    recognition.maxAlternatives = 1;
-    const defaultSilenceTimeout = 5000;
-    const extendedSilenceTimeout = 15000;
-    let silenceTimer;
-    let currentTimeout = defaultSilenceTimeout;
-    const resetSilenceTimer = () => {
-      clearTimeout(silenceTimer);
-      silenceTimer = setTimeout(() => {
-        recognition.stop();
-        setListening(false);
-        performSearch(query);
-      }, currentTimeout);
-    };
-    recognition.onstart = () => {
-      setListening(true);
-      resetSilenceTimer();
-    };
-    recognition.onresult = (event) => {
-      clearTimeout(silenceTimer);
-      let interim = '';
-      let final = '';
-      for (let i = 0; i < event.results.length; i++) {
-        const result = event.results[i];
-        const transcript = result[0].transcript;
-        if (result.isFinal) {
-          final += transcript + ' ';
-        } else {
-          interim += transcript;
-        }
-      }
-      const activationPhrase = /prashnasarathi\s+activate/i;
-      if (activationPhrase.test(final)) {
-        currentTimeout = extendedSilenceTimeout;
-        setQuery('');
-      }
-      if (final.trim()) {
-        setQuery(final.trim());
-        recognition.stop();
-        setListening(false);
-        performSearch(final.trim());
-      } else {
-        setQuery(interim);
+    // Attempt native SpeechRecognition first
+    if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-IN'; // use Indian English for better phrase matching
+      recognition.interimResults = true;
+      recognition.maxAlternatives = 5;
+      // ... existing recognition logic (same as before) ...
+      // Insert existing recognition setup code from lines 48-110
+      const defaultSilenceTimeout = 5000;
+      const extendedSilenceTimeout = 15000;
+      let silenceTimer;
+      let currentTimeout = defaultSilenceTimeout;
+      const resetSilenceTimer = () => {
+        clearTimeout(silenceTimer);
+        silenceTimer = setTimeout(() => {
+          recognition.stop();
+          setListening(false);
+          performSearch(query);
+        }, currentTimeout);
+      };
+      recognition.onstart = () => {
+        setListening(true);
         resetSilenceTimer();
+      };
+      recognition.onresult = (event) => {
+        clearTimeout(silenceTimer);
+        let interim = '';
+        let final = '';
+        for (let i = 0; i < event.results.length; i++) {
+          const result = event.results[i];
+          const transcript = result[0].transcript;
+          if (result.isFinal) {
+            final += transcript + ' ';
+          } else {
+            interim += transcript;
+          }
+        }
+        const activationPhrase = /prashna\s*sarathi\s*activate/i;
+        if (activationPhrase.test(final)) {
+          currentTimeout = extendedSilenceTimeout;
+          setQuery('');
+        }
+        if (final.trim()) {
+          setQuery(final.trim());
+          recognition.stop();
+          setListening(false);
+          performSearch(final.trim());
+        } else {
+          setQuery(interim);
+          resetSilenceTimer();
+        }
+      };
+      recognition.onerror = (e) => {
+        console.error('Speech recognition error', e);
+        toast.error('Voice input error');
+        // Fallback to AI transcription if microphone captured audio
+        fallbackToAI();
+      };
+      recognition.onend = () => {
+        clearTimeout(silenceTimer);
+        setListening(false);
+      };
+      recognition.start();
+      recognitionRef.current = recognition;
+    } else {
+      // Browser does not support SpeechRecognition – fall back to AI transcription
+      fallbackToAI();
+    }
+    // Helper to capture a short audio snippet and send to backend AI model
+    async function fallbackToAI() {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mediaRecorder = new MediaRecorder(stream);
+        const chunks = [];
+        mediaRecorder.ondataavailable = e => chunks.push(e.data);
+        mediaRecorder.onstop = async () => {
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          const resp = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: blob
+          });
+          const data = await resp.json();
+          if (data?.text) {
+            setQuery(data.text.trim());
+            performSearch(data.text.trim());
+          }
+        };
+        mediaRecorder.start();
+        setTimeout(() => mediaRecorder.stop(), 5000); // record up to 5 seconds
+      } catch (err) {
+        console.error('AI transcription fallback failed', err);
+        toast.error('Voice input unavailable');
       }
-    };
-    recognition.onerror = (e) => {
-      console.error('Speech recognition error', e);
-      toast.error('Voice input error');
-      clearTimeout(silenceTimer);
-      setListening(false);
-    };
-    recognition.onend = () => {
-      clearTimeout(silenceTimer);
-      setListening(false);
-    };
-    recognition.start();
-    recognitionRef.current = recognition;
-  };
+    }
 
   // Cleanup on component unmount
   useEffect(() => {
@@ -128,6 +153,13 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose }, ref) {
       pause();
     }
   }, [isOpen, pause, resume]);
+
+  // Auto‑start listening when opened via activation phrase
+  useEffect(() => {
+    if (isOpen && autoStart) {
+      handleVoiceInput();
+    }
+  }, [isOpen, autoStart]);
 
   useEffect(() => {
     if (query.trim()) {
@@ -330,5 +362,3 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose }, ref) {
     </div>
   );
 });
-
-export default SearchModal;
