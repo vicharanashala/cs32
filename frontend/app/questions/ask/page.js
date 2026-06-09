@@ -12,8 +12,55 @@ const DRAFT_TAGS_KEY = 'question_draft_tags';
 export default function AskQuestionPage() {
   const router = useRouter();
   const { user, loading: authLoading } = useAuth();
+
   const [form, setForm] = useState({ title: '', body: '', category: '', tagInput: '', anonymous: false });
   const [tags, setTags] = useState([]);
+  const [attachments, setAttachments] = useState([]);
+  const [links, setLinks] = useState([]);
+  const [linkForm, setLinkForm] = useState({ title: '', url: '' });
+
+  const handleFileChange = (e) => {
+    const files = Array.from(e.target.files);
+    files.forEach(file => {
+      if (file.size > 2 * 1024 * 1024) {
+        toast.error(`File "${file.name}" exceeds the 2MB limit.`);
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachments(prev => [
+          ...prev,
+          {
+            filename: file.name,
+            content: reader.result, // base64 string
+            mimetype: file.type,
+            size: file.size
+          }
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+    e.target.value = null; // Reset input
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(prev => prev.filter((_, idx) => idx !== index));
+  };
+
+  const addLink = () => {
+    if (!linkForm.url) return;
+    let url = linkForm.url.trim();
+    if (!/^https?:\/\//i.test(url)) {
+      url = 'https://' + url;
+    }
+    setLinks(prev => [...prev, { title: linkForm.title.trim() || url, url }]);
+    setLinkForm({ title: '', url: '' });
+  };
+
+  const removeLink = (index) => {
+    setLinks(prev => prev.filter((_, idx) => idx !== index));
+  };
+
   const [tagSuggestions, setTagSuggestions] = useState([]);
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -200,7 +247,15 @@ const handleVoiceInput = () => {
 
     setLoading(true);
     try {
-      const data = await api.post('/questions', { title: form.title, body: form.body, category: form.category, tags, anonymous: form.anonymous });
+      const data = await api.post('/questions', {
+        title: form.title,
+        body: form.body,
+        category: form.category,
+        tags,
+        anonymous: form.anonymous,
+        attachments,
+        links
+      });
       localStorage.removeItem(DRAFT_KEY);
       localStorage.removeItem(DRAFT_TAGS_KEY);
       if (data.alreadyAsked) {
@@ -475,6 +530,92 @@ const handleVoiceInput = () => {
                 </div>
               )}
             </div>
+          </div>
+
+          {/* Attachments Section */}
+          <div className="border border-[var(--color-border)] rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/20">
+            <label className="label block font-semibold text-sm mb-1">Attachments</label>
+            <p className="text-xs text-[var(--color-text-secondary)] mb-3">Upload helpful documents, screenshots, or files (Max 2MB per file).</p>
+            
+            <input
+              type="file"
+              multiple
+              onChange={handleFileChange}
+              className="hidden"
+              id="file-upload"
+            />
+            <label
+              htmlFor="file-upload"
+              className="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-[var(--color-border)] hover:bg-gray-50 dark:hover:bg-gray-700 text-sm font-medium text-[var(--color-text)] rounded-lg cursor-pointer transition-colors shadow-sm"
+            >
+              <span>📁</span> Choose Files
+            </label>
+
+            {attachments.length > 0 && (
+              <div className="mt-3 space-y-2">
+                {attachments.map((file, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 border border-[var(--color-border)] rounded-lg text-xs">
+                    <span className="font-medium text-[var(--color-text)] truncate max-w-[250px]">{file.filename}</span>
+                    <button
+                      type="button"
+                      onClick={() => removeAttachment(idx)}
+                      className="text-red-500 hover:text-red-750 font-bold px-2"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Reference Links Section */}
+          <div className="border border-[var(--color-border)] rounded-lg p-4 bg-gray-50/50 dark:bg-gray-800/20">
+            <label className="label block font-semibold text-sm mb-1">Reference Links</label>
+            <p className="text-xs text-[var(--color-text-secondary)] mb-3">Add URLs to websites, documentation, or online tools related to your question.</p>
+            
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
+              <input
+                type="text"
+                value={linkForm.title}
+                onChange={(e) => setLinkForm({ ...linkForm, title: e.target.value })}
+                className="input text-xs py-1.5"
+                placeholder="Link Title (e.g. React Docs)"
+              />
+              <input
+                type="text"
+                value={linkForm.url}
+                onChange={(e) => setLinkForm({ ...linkForm, url: e.target.value })}
+                className="input text-xs py-1.5 flex-1"
+                placeholder="URL (e.g. https://react.dev)"
+              />
+              <button
+                type="button"
+                onClick={addLink}
+                className="btn-primary text-xs py-1.5 px-4 h-full"
+              >
+                Add Link
+              </button>
+            </div>
+
+            {links.length > 0 && (
+              <div className="space-y-2">
+                {links.map((link, idx) => (
+                  <div key={idx} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 border border-[var(--color-border)] rounded-lg text-xs">
+                    <a href={link.url} target="_blank" rel="noopener noreferrer" className="font-medium text-primary-600 hover:underline truncate max-w-[250px]">
+                      {link.title || link.url}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => removeLink(idx)}
+                      className="text-red-500 hover:text-red-750 font-bold px-2"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg border border-[var(--color-border)]">

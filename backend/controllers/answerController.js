@@ -38,7 +38,9 @@ exports.createAnswer = async (req, res, next) => {
       author: req.user._id,
       confidenceLevel: req.body.confidenceLevel || null,
       visibility,
-      triggeredRule: req.body.triggeredRule || undefined
+      triggeredRule: req.body.triggeredRule || undefined,
+      attachments: req.body.attachments || [],
+      links: req.body.links || [],
     });
 
     const AuditLog = require('../models/AuditLog');
@@ -159,6 +161,8 @@ exports.getAnswers = async (req, res, next) => {
           'author.displayName': 1,
           'author.avatar': 1,
           'author.reputation': 1,
+          attachments: 1,
+          links: 1,
         },
       },
     ];

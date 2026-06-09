@@ -16,9 +16,9 @@ export const VoiceCommandProvider = ({ children }) => {
   const [autoStart, setAutoStart] = useState(false);
   const recognitionRef = useRef(null);
 
-  const openSearch = () => {
+  const openSearch = (startListening = false) => {
     setSearchOpen(true);
-    setAutoStart(true);
+    setAutoStart(startListening);
   };
   const closeSearch = () => {
     setSearchOpen(false);
@@ -70,7 +70,7 @@ export const VoiceCommandProvider = ({ children }) => {
                 id: 'voice-activate',
                 icon: '🎙️'
               });
-              openSearch();
+              openSearch(true);
               break;
             }
           }

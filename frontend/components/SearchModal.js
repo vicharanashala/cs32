@@ -202,7 +202,7 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose, autoStart
     if (isOpen && autoStart) {
       const timer = setTimeout(() => {
         handleVoiceInput();
-      }, 300);
+      }, 600);
       return () => clearTimeout(timer);
     }
   }, [isOpen, autoStart]);

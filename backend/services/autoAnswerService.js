@@ -277,6 +277,7 @@ const generateAndPostAutoAnswer = async (question, botUser) => {
   try {
     const Answer = require('../models/Answer');
     const User = require('../models/User');
+    const Question = require('../models/Question');
     const { recalculateAnswerCount } = require('../utils/helpers');
 
     console.log(`[AutoAnswer] Processing question: "${question.title}" (${question._id})`);
@@ -288,56 +289,125 @@ const generateAndPostAutoAnswer = async (question, botUser) => {
       return;   // Do not post any bot answer for flagged content
     }
 
-    // ── Step 2: Fetch knowledge documents ────────────────────────────────
+    // ── Step 2: Check duplicate questions ────────────────────────────────
+    if (question.isAlreadyAsked && question.relatedQuestions && question.relatedQuestions.length > 0) {
+      const originalQ = await Question.findOne({ _id: question.relatedQuestions[0], isDeleted: false });
+      if (originalQ) {
+        console.log(`[AutoAnswer] Question is duplicate of ${originalQ._id}. Posting reference path.`);
+        
+        const duplicateAnswerBody = `**PrashnaSarathi AI Bot**
+ 
+📌 *Duplicate Question Detected*
+ 
+This question appears to be highly similar or identical to an existing question on the platform:
+👉 **[${originalQ.title}](/questions/${originalQ._id})**
+ 
+Please refer to the link above to view existing answers and discussions.`;
+
+        const answer = await Answer.create({
+          body: duplicateAnswerBody,
+          question: question._id,
+          author: botUser._id,
+          visibility: 'public',
+          isOfficial: true,
+          confidenceLevel: 'high',
+        });
+
+        await Question.findByIdAndUpdate(question._id, {
+          $inc: { answerCount: 1 },
+          lastActivity: new Date(),
+        });
+        await User.findByIdAndUpdate(botUser._id, { $inc: { answerCount: 1 } });
+        await recalculateAnswerCount(question._id);
+
+        try {
+          const { emitToQuestion } = require('../socket');
+          const populated = await Answer.findById(answer._id)
+            .populate('author', 'username displayName avatar reputation')
+            .lean();
+          emitToQuestion(question._id.toString(), 'answer:new', { answer: populated });
+        } catch (socketErr) {
+          console.warn('[AutoAnswer] Socket emit failed for duplicate answer:', socketErr.message);
+        }
+        return;
+      }
+    }
+
+    // ── Step 3: Fetch knowledge documents ────────────────────────────────
     const documents = await fetchKnowledgeDocuments(question.title, question.tagNames || []);
     console.log(`[AutoAnswer] Found ${documents.length} relevant knowledge documents.`);
 
-    // ── Step 3: Decide whether to proceed ────────────────────────────────
-    // We only call the AI if we have at least 1 supporting document.
-    if (documents.length === 0) {
-      console.log('[AutoAnswer] Insufficient knowledge — skipping auto-answer.');
-      return;
-    }
+    let aiText = '';
+    let isGeneralKnowledge = false;
 
-    // ── Step 4: Build prompt ──────────────────────────────────────────────
-    const knowledgeContext = documents
-      .slice(0, 8)   // Cap at 8 documents to stay within token budget
-      .map((doc, i) => `Document [${i + 1}]:\n${doc}`)
-      .join('\n\n---\n\n');
+    if (documents.length > 0) {
+      // ── Step 4: Build prompt ──────────────────────────────────────────────
+      const knowledgeContext = documents
+        .slice(0, 8)   // Cap at 8 documents to stay within token budget
+        .map((doc, i) => `Document [${i + 1}]:\n${doc}`)
+        .join('\n\n---\n\n');
 
-    const prompt = `${BOT_SYSTEM_INSTRUCTIONS}
-
+      const prompt = `${BOT_SYSTEM_INSTRUCTIONS}
+ 
 ===== KNOWLEDGE BASE =====
 ${knowledgeContext}
 ===== END KNOWLEDGE BASE =====
-
+ 
 Student's question: "${question.title}"
 ${question.body ? `\nAdditional context provided by student:\n${question.body}` : ''}
-
+ 
 Remember: Only answer if you find sufficient information in the Knowledge Base above. Otherwise respond with exactly: NOT_FOUND`;
 
-    // ── Step 5: Call Gemini AI ────────────────────────────────────────────
-    const aiText = await callGeminiAI(prompt);
+      aiText = await callGeminiAI(prompt);
+      
+      if (!aiText || aiText.trim() === 'NOT_FOUND' || aiText.trim().startsWith('NOT_FOUND')) {
+        console.log('[AutoAnswer] AI returned NOT_FOUND — falling back to general knowledge.');
+        isGeneralKnowledge = true;
+      }
+    } else {
+      isGeneralKnowledge = true;
+    }
 
-    if (!aiText || aiText.trim() === 'NOT_FOUND' || aiText.trim().startsWith('NOT_FOUND')) {
-      console.log('[AutoAnswer] AI returned NOT_FOUND — skipping auto-answer.');
-      return;
+    // ── Step 5: Fallback to General Knowledge if needed ───────────────────
+    if (isGeneralKnowledge) {
+      const prompt = `You are PrashnaSarathi AI Bot, an assistant for the PrashnaSārathi internship community portal.
+We could not find matching documents in our repository for this query.
+Therefore, answer the student's question to the best of your ability using your general knowledge.
+Be helpful, professional, and clear.
+ 
+Student's question: "${question.title}"
+${question.body ? `\nAdditional context provided by student:\n${question.body}` : ''}
+ 
+Provide a clear, formatted answer using bullet points if needed. Do NOT include preambles or sign-offs.`;
+
+      aiText = await callGeminiAI(prompt);
     }
 
     // Sanity check: if the AI response is very short or empty, skip
-    if (aiText.trim().length < 30) {
-      console.log('[AutoAnswer] AI response too short — skipping.');
+    if (!aiText || aiText.trim().length < 10) {
+      console.log('[AutoAnswer] AI response empty or too short — skipping.');
       return;
     }
 
     // ── Step 6: Format the bot answer ─────────────────────────────────────
-    const botAnswerBody = `**PrashnaSarathi AI Bot**
-
-⚠️ *AI-generated answer based on available knowledge. Please verify the information before proceeding.*
-
+    let botAnswerBody = '';
+    if (isGeneralKnowledge) {
+      botAnswerBody = `**PrashnaSarathi AI Bot (General Knowledge Mode)**
+ 
+⚠️ *This answer is generated using general AI knowledge, as no direct matching documents were found in our official repository. Please verify the details.*
+ 
 ---
-
+ 
 ${aiText.trim()}`;
+    } else {
+      botAnswerBody = `**PrashnaSarathi AI Bot**
+ 
+⚠️ *AI-generated answer based on available knowledge. Please verify the information before proceeding.*
+ 
+---
+ 
+${aiText.trim()}`;
+    }
 
     // ── Step 7: Post the answer ───────────────────────────────────────────
     const answer = await Answer.create({
@@ -346,11 +416,11 @@ ${aiText.trim()}`;
       author: botUser._id,
       visibility: 'public',
       isOfficial: true,
-      confidenceLevel: documents.length >= 3 ? 'high' : documents.length === 2 ? 'medium' : 'low',
+      confidenceLevel: isGeneralKnowledge ? 'low' : documents.length >= 3 ? 'high' : documents.length === 2 ? 'medium' : 'low',
     });
 
     // Update question answer count + last activity
-    await require('../models/Question').findByIdAndUpdate(question._id, {
+    await Question.findByIdAndUpdate(question._id, {
       $inc: { answerCount: 1 },
       lastActivity: new Date(),
     });

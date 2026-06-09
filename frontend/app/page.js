@@ -7,8 +7,8 @@ import toast from 'react-hot-toast';
 import { useAuth } from '@/context/AuthContext';
 import MarkdownRenderer from '@/components/MarkdownRenderer';
 import RecommendedFAQs from '@/components/RecommendedFAQs';
+import MascotCompanion from '@/components/MascotCompanion';
 import { useVoiceCommand } from '@/context/VoiceCommandContext';
-
 
 const CATEGORY_ICONS = {
   'About the internship': '💼',
@@ -274,7 +274,7 @@ export default function HomePage() {
                 value={searchQuery}
                 onFocus={(e) => {
                   e.target.blur();
-                  openSearch();
+                  openSearch(false);
                 }}
                 placeholder="Search questions, categories, tags..."
                 className="flex-1 bg-transparent text-sm text-[var(--color-text)] outline-none placeholder:text-[var(--color-text-muted)] cursor-pointer"
@@ -287,27 +287,13 @@ export default function HomePage() {
                   onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    openSearch();
+                    openSearch(true);
                   }}
                   className="p-1.5 rounded-full hover:bg-[var(--color-bg-tertiary)] text-[var(--color-text-secondary)] hover:text-[var(--color-primary)] active:scale-95 transition-all"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
                   </svg>
-                </button>
-
-                {/* AI Mode Pill Button */}
-                <button
-                  type="button"
-                  title="AI Mode Search"
-                  onClick={(e) => {
-                    e.preventDefault();
-                    e.stopPropagation();
-                    openSearch();
-                  }}
-                  className="bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-semibold text-xs rounded-full px-3.5 py-1.5 flex items-center gap-1.5 shadow-md shadow-purple-500/25 transition-all hover:scale-[1.03] active:scale-[0.98]"
-                >
-                  <span>✨ AI Mode</span>
                 </button>
               </div>
             </div>
@@ -673,6 +659,7 @@ export default function HomePage() {
           </div>
         </div>
       )}
+      {user && <MascotCompanion />}
     </div>
   );
 }

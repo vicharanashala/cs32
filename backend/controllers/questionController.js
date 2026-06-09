@@ -101,7 +101,9 @@ exports.createQuestion = async (req, res, next) => {
       triggeredRule: isAiFlaggedNoise ? 'AI Noise Filter' : (req.body.triggeredRule || undefined),
       phase: phase || mapUserPhase(req.user.currentPhase) || 'onboarding',
       anomalySeverity: isAiFlaggedNoise ? 'high' : 'none',
-      anomalyScore: isAiFlaggedNoise ? 0.95 : 0
+      anomalyScore: isAiFlaggedNoise ? 0.95 : 0,
+      attachments: req.body.attachments || [],
+      links: req.body.links || [],
     };
 
     if (existingQuestion) {
