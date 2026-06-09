@@ -39,6 +39,9 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose, autoStart
     startListening: handleVoiceInput
   }));
 
+  const handleVoiceInput = () => {
+    if (typeof window === 'undefined') return;
+
     // Attempt native SpeechRecognition first
     if ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window) {
       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -46,8 +49,7 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose, autoStart
       recognition.lang = 'en-IN'; // use Indian English for better phrase matching
       recognition.interimResults = true;
       recognition.maxAlternatives = 5;
-      // ... existing recognition logic (same as before) ...
-      // Insert existing recognition setup code from lines 48-110
+
       const defaultSilenceTimeout = 5000;
       const extendedSilenceTimeout = 15000;
       let silenceTimer;
@@ -108,6 +110,7 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose, autoStart
       // Browser does not support SpeechRecognition – fall back to AI transcription
       fallbackToAI();
     }
+
     // Helper to capture a short audio snippet and send to backend AI model
     async function fallbackToAI() {
       try {
@@ -134,6 +137,8 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose, autoStart
         toast.error('Voice input unavailable');
       }
     }
+  };
+
 
   // Cleanup on component unmount
   useEffect(() => {
@@ -362,3 +367,5 @@ const SearchModal = forwardRef(function SearchModal({ isOpen, onClose, autoStart
     </div>
   );
 });
+
+export default SearchModal;
